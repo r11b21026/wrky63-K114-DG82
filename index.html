@@ -67,6 +67,15 @@
     </div>
   </header>
 
+  <!-- 鹼基圖例 (比照 index1，右上方極簡懸浮) -->
+  <div id="base-legend" class="absolute top-14 right-3 z-20 bg-slate-900/85 backdrop-blur-md border border-slate-700/70 rounded-xl px-2.5 py-1.5 pointer-events-none shadow-lg text-[10px] font-mono flex items-center gap-2">
+    <span class="text-slate-400 font-bold border-r border-slate-700 pr-1.5">DNA</span>
+    <div class="flex items-center space-x-1"><span class="w-2 h-2 rounded-full" style="background:#3859F2"></span><span class="text-slate-300">A</span></div>
+    <div class="flex items-center space-x-1"><span class="w-2 h-2 rounded-full" style="background:#EB4759"></span><span class="text-slate-300">T</span></div>
+    <div class="flex items-center space-x-1"><span class="w-2 h-2 rounded-full" style="background:#F29433"></span><span class="text-slate-300">C</span></div>
+    <div class="flex items-center space-x-1"><span class="w-2 h-2 rounded-full" style="background:#26CC40"></span><span class="text-slate-300">G</span></div>
+  </div>
+
   <!-- 讀取狀態遮罩 -->
   <div id="loading-overlay" class="absolute inset-0 z-50 bg-black/60 backdrop-blur-sm flex flex-col items-center justify-center transition-opacity duration-200 pointer-events-none">
     <div class="bg-slate-900 border border-cyan-500/40 rounded-2xl p-5 flex flex-col items-center space-y-2.5 shadow-2xl">
@@ -88,11 +97,13 @@
 
       <!-- 播放控制按鈕列 -->
       <div class="flex items-center justify-between w-full">
+        <!-- 循環模式 -->
         <button id="btn-loop-mode" class="px-2 py-1 rounded-lg text-xs font-mono bg-slate-800 border border-slate-700 text-cyan-400 hover:text-white transition flex items-center space-x-1">
           <i data-lucide="repeat" class="w-3 h-3"></i>
           <span id="loop-label">循環</span>
         </button>
 
+        <!-- 播放主按鍵 -->
         <div class="flex items-center space-x-1">
           <button id="btn-first-frame" class="p-1.5 rounded-lg hover:bg-slate-800 text-slate-300 hover:text-white transition">
             <i data-lucide="skip-back" class="w-4 h-4"></i>
@@ -111,7 +122,12 @@
           </button>
         </div>
 
-        <div class="w-12"></div>
+        <!-- 播放速率切換 (針對 60 幀左右調降速度) -->
+        <div class="flex items-center space-x-1">
+          <button id="btn-speed" class="px-2 py-0.5 rounded-lg text-[11px] font-mono bg-slate-800 border border-slate-700 text-slate-300 hover:text-cyan-300 transition" title="點擊切換播放速度">
+            <span id="speed-label">6 FPS</span>
+          </button>
+        </div>
       </div>
     </div>
   </footer>
@@ -124,10 +140,14 @@
       'THR': 'T', 'TRP': 'W', 'TYR': 'Y', 'VAL': 'V'
     };
 
-    // 標準編號常數：以 WRKYGQK 的 W 為 108 作為絕對基準
-    const STANDARD_ANCHOR_W = 108; 
-    const STANDARD_TARGET_K = 114; // WRKYGQK 的 K (108 + 6 = 114)
-    const STANDARD_TARGET_DG = 82; // DNA 上的 DG82
+    // 核心基準編號：以 WRKYGQK 中的 W108 為基準
+    const STANDARD_ANCHOR_W = 108;
+    const STANDARD_TARGET_K = 114;
+    const STANDARD_TARGET_DG = 82;
+
+    // 氫鍵/鹽橋判斷距離閥值 (Å)
+    // 嚴格標準：重原子供體-受體距離 <= 3.5 Å，若大於此距離即視為斷開！
+    const HBOND_MAX_DISTANCE = 3.5;
 
     const appState = {
       stage: null,
@@ -139,16 +159,21 @@
       loopMode: 'loop',
       direction: 1,
       timerId: null,
-      fps: 15,
+      fps: 6, // 慢速播放預設 (6 FPS：60幀約播10秒，細微變化極清晰)
       origSS: null,
       ssSchemeIds: null,
-      
+
       // 特寫相關狀態
       isFocusMode: false,
-      actualKResnoInPdb: null,     // 由 W108 基準計算出在該 PDB 檔內的真實 resno
-      actualDGResnoInPdb: null,   // DNA 上的 DG82 在該 PDB 檔內的真實 resno
-      dynamicPairs: [],           // 動態測量的原子 index 對
-      focusLabelsComp: null
+      actualKResnoInPdb: null,
+      actualDGResnoInPdb: null,
+      dynamicPairs: [], // 當前成鍵原子索引對
+      focusLabelsComp: null,
+
+      // DNA VMD 階梯柱狀相關數據
+      dnaStrandSelections: [],
+      dnaRungStubs: [],
+      ladderShapeComp: null
     };
 
     lucide.createIcons();
@@ -168,9 +193,12 @@
       btnLastFrame: document.getElementById('btn-last-frame'),
       btnLoopMode: document.getElementById('btn-loop-mode'),
       loopLabel: document.getElementById('loop-label'),
+      btnSpeed: document.getElementById('btn-speed'),
+      speedLabel: document.getElementById('speed-label'),
       btnResetView: document.getElementById('btn-reset-view'),
       btnFocusPair: document.getElementById('btn-focus-pair'),
-      focusBtnText: document.getElementById('focus-btn-text')
+      focusBtnText: document.getElementById('focus-btn-text'),
+      baseLegend: document.getElementById('base-legend')
     };
 
     function showLoading(text) {
@@ -346,10 +374,12 @@
     }
 
     /**
-     * 以 W108 作為基準校準胺基酸編號
-     * 精準定位 WRKYGQK 中的 W (基準 108) 與 K (基準 114)
+     * 比照完整版：結構深度解析
+     * 1. 以 W108 為絕對基準校準 K114
+     * 2. 解析 DNA 階梯柱狀 (VMD Ladder Rungs) 與骨架分股
      */
-    function calibrateResiduesWithW108(structure) {
+    function analyzeStructureFull(structure) {
+      const nucleicResList = [];
       const protResList = [];
       const dnaResnos = [];
 
@@ -361,12 +391,39 @@
             resname: rn,
             code: AA_MAP[rn] || 'X'
           });
-        } else if (r.isNucleic() || /^(D?G)/.test(rn)) {
-          dnaResnos.push(r.resno);
+        } else {
+          const isDna = r.isNucleic() || /^(D[ATCG][35]?|[ATCG][35]?)$/.test(rn);
+          if (isDna) {
+            dnaResnos.push(r.resno);
+            let o3 = null, p = null, backboneAtom = null, baseRing = null;
+            r.eachAtom(a => {
+              const aname = a.atomname.trim();
+              if (aname === "O3'" || aname === "O3*") o3 = { x: a.x, y: a.y, z: a.z };
+              if (aname === "P") {
+                p = { x: a.x, y: a.y, z: a.z };
+                backboneAtom = a.index;
+              }
+              if (!backboneAtom && (aname === "C4'" || aname === "C3'" || aname === "C1'")) backboneAtom = a.index;
+              if (aname === "N1" || aname === "N3" || aname === "C4") {
+                if (!baseRing || aname === "N1" || aname === "N3") baseRing = a.index;
+              }
+            });
+            if (!backboneAtom) r.eachAtom(a => { if (!backboneAtom) backboneAtom = a.index; });
+            if (!baseRing) baseRing = backboneAtom;
+
+            nucleicResList.push({
+              resno: r.resno,
+              chain: (r.chainname || 'A').trim(),
+              resname: rn,
+              o3: o3, p: p,
+              c1Index: backboneAtom,
+              ringIndex: baseRing
+            });
+          }
         }
       });
 
-      // 1. 尋找 WRKYGQK 核心序列以精確比對 W
+      // 1. 序列基準 W108 比對
       const seqStr = protResList.map(x => x.code).join('');
       const motifIdx = seqStr.indexOf('WRKYGQK');
 
@@ -375,20 +432,12 @@
         const wInPdb = protResList[motifIdx].resno;
         deltaOffset = STANDARD_ANCHOR_W - wInPdb;
       } else {
-        // 若序列被截斷，以第一個出現的 Trp (W) 作為 W108 基準
         const sampleW = protResList.find(r => r.code === 'W');
-        if (sampleW) {
-          deltaOffset = STANDARD_ANCHOR_W - sampleW.resno;
-        } else {
-          deltaOffset = 0;
-        }
+        if (sampleW) deltaOffset = STANDARD_ANCHOR_W - sampleW.resno;
       }
-
-      // K114 在當前 PDB 中的實際編號：
-      // standard_resno = actual_resno + deltaOffset => actual_resno = standard_resno - deltaOffset
       appState.actualKResnoInPdb = STANDARD_TARGET_K - deltaOffset;
 
-      // 2. DNA DG82 判定 (通常為 82，若有特定偏移亦能直接匹配)
+      // 2. DNA DG82 判定
       if (dnaResnos.includes(STANDARD_TARGET_DG)) {
         appState.actualDGResnoInPdb = STANDARD_TARGET_DG;
       } else if (dnaResnos.length > 0) {
@@ -397,11 +446,45 @@
         appState.actualDGResnoInPdb = STANDARD_TARGET_DG;
       }
 
-      console.log(`[校準完成] 基準 W108 偏移量 delta: ${deltaOffset} | K114 映射到 PDB resno: ${appState.actualKResnoInPdb} | DG82 resno: ${appState.actualDGResnoInPdb}`);
+      // 3. DNA 階梯柱狀數據建置 (Ladder Stubs)
+      if (nucleicResList.length > 0) {
+        const strandGroups = [];
+        let curGroup = [nucleicResList[0]];
+
+        for (let i = 0; i < nucleicResList.length - 1; i++) {
+          const r1 = nucleicResList[i];
+          const r2 = nucleicResList[i + 1];
+          let dist = 999;
+          if (r1.o3 && r2.p) {
+            dist = Math.hypot(r1.o3.x - r2.p.x, r1.o3.y - r2.p.y, r1.o3.z - r2.p.z);
+          }
+          if (dist > 4.5 || r1.resname.endsWith('3') || r2.resname.endsWith('5')) {
+            strandGroups.push(curGroup);
+            curGroup = [r2];
+          } else {
+            curGroup.push(r2);
+          }
+        }
+        if (curGroup.length > 0) strandGroups.push(curGroup);
+
+        appState.dnaStrandSelections = strandGroups.map(grp => {
+          const minR = grp[0].resno;
+          const maxR = grp[grp.length - 1].resno;
+          return `(${minR}-${maxR} and not protein and not hydrogen)`;
+        });
+
+        appState.dnaRungStubs = nucleicResList.map(item => ({
+          anchor: item.c1Index,
+          target: item.ringIndex,
+          resname: item.resname,
+          resno: item.resno
+        }));
+      }
     }
 
     /**
-     * 計算 K114 與 DG82 之間的即時原子距離與鍵結
+     * 嚴格物理距離檢查：隨時間判定 K114 與 DG82 作用鍵
+     * 若距離超過 HBOND_MAX_DISTANCE (3.5 Å)，判定為斷鍵 (不繪製虛線)
      */
     function updateDynamicInteractions(structure) {
       appState.dynamicPairs = [];
@@ -419,14 +502,18 @@
         if (r.resno === appState.actualDGResnoInPdb) {
           r.eachAtom(a => {
             const aname = a.atomname.trim();
-            dgAtoms.push({ index: a.index, name: aname, x: a.x, y: a.y, z: a.z });
+            // OP1, OP2 (磷酸主鏈) 或 O6, N7, N1 (鹼基環受體/供體)
+            const isPolarTarget = /^(OP1|OP2|O1P|O2P|O6|N7|N1|O3'|O5')$/.test(aname);
+            if (isPolarTarget) {
+              dgAtoms.push({ index: a.index, name: aname, x: a.x, y: a.y, z: a.z });
+            }
           });
         }
       });
 
       if (kAtoms.length === 0 || dgAtoms.length === 0) return;
 
-      // 優先以 K114 的側鏈正電荷胺基 (NZ) 與 DG82 的極性/負電原子 (OP1, OP2, O6, N7, N1) 配對
+      // K114 側鏈帶正電的 NZ (若無則取 CA/N)
       const nzAtom = kAtoms.find(a => a.isNZ) || kAtoms[0];
       let minTarget = null;
       let minDist = 999;
@@ -439,25 +526,30 @@
         }
       });
 
-      // 閾值設在 6.0 Å 內均顯示動態鍵結與距離標籤
-      if (minTarget && minDist <= 6.0) {
+      // 嚴格閥值：只有小於等於 3.5 Å 才有成鍵！超過 3.5 Å 瞬間斷開，絕不拖泥帶水
+      if (minTarget && minDist <= HBOND_MAX_DISTANCE) {
         appState.dynamicPairs.push([nzAtom.index, minTarget.index]);
       }
     }
 
-    // 套用表示法
+    // 重繪所有 Representation (包含完整版 VMD Ladder 與特寫鍵結)
     function applyAllRepresentations() {
       if (!appState.component) return;
       appState.component.removeAllRepresentations();
 
+      // 清除先前的自訂 Shape (梯級與文字標籤)
+      if (appState.ladderShapeComp) {
+        appState.stage.removeComponent(appState.ladderShapeComp);
+        appState.ladderShapeComp = null;
+      }
       if (appState.focusLabelsComp) {
         appState.stage.removeComponent(appState.focusLabelsComp);
         appState.focusLabelsComp = null;
       }
 
-      const bgOpacity = appState.isFocusMode ? 0.25 : 1.0;
+      const bgOpacity = appState.isFocusMode ? 0.22 : 1.0;
 
-      // 1. 蛋白質主體 (PyMOL 配色卡通模型)
+      // 1. 蛋白質主體 (PyMOL SS 卡通)
       appState.component.addRepresentation('cartoon', {
         sele: 'protein and not hydrogen and not (_ZN or :ZN or [ZN] or zinc)',
         colorScheme: appState.ssSchemeIds.pymol_ss,
@@ -469,20 +561,85 @@
         opacity: bgOpacity
       });
 
-      // 2. DNA 雙螺旋卡通主體
-      appState.component.addRepresentation('cartoon', {
-        sele: 'nucleic and not protein and not hydrogen and not (_ZN or :ZN or [ZN] or zinc)',
-        color: '#7dd3fc',
-        radiusType: 'size',
-        radiusSize: 0.6,
-        aspectRatio: 4,
-        tension: 0.3,
-        smoothSheet: false,
-        subdiv: 12,
-        opacity: bgOpacity
-      });
+      // 2. DNA 骨架雙螺旋卡通
+      if (appState.dnaStrandSelections && appState.dnaStrandSelections.length > 0) {
+        appState.dnaStrandSelections.forEach(strandSele => {
+          appState.component.addRepresentation('cartoon', {
+            sele: `${strandSele} and not protein and not (_ZN or :ZN or [ZN] or zinc)`,
+            color: '#7dd3fc',
+            radiusType: 'size',
+            radiusSize: 0.55,
+            aspectRatio: 4,
+            tension: 0.3,
+            smoothSheet: false,
+            subdiv: 12,
+            opacity: bgOpacity
+          });
+        });
+      } else {
+        appState.component.addRepresentation('cartoon', {
+          sele: 'nucleic and not protein and not hydrogen and not (_ZN or :ZN or [ZN] or zinc)',
+          color: '#7dd3fc',
+          radiusType: 'size',
+          radiusSize: 0.55,
+          aspectRatio: 4,
+          tension: 0.3,
+          smoothSheet: false,
+          subdiv: 12,
+          opacity: bgOpacity
+        });
+      }
 
-      // 3. 鋅離子 (spacefill)
+      // 3. DNA 階梯柱狀 (比照完整版 VMD Ladder Rungs，帶鹼基標準配色)
+      if (appState.dnaRungStubs && appState.dnaRungStubs.length > 0) {
+        const shape = new NGL.Shape("vmd_rungs");
+        const structure = appState.component.structure;
+
+        const baseColorPalette = {
+          'A': [0.22, 0.35, 0.95],
+          'T': [0.92, 0.28, 0.35],
+          'C': [0.95, 0.58, 0.20],
+          'G': [0.15, 0.80, 0.25],
+          'U': [0.92, 0.28, 0.35]
+        };
+
+        const parseBaseColor = (rname) => {
+          const clean = (rname || '').trim().toUpperCase().replace(/^D/, '').replace(/[35]$/, '');
+          return baseColorPalette[clean] || [0.8, 0.84, 0.89];
+        };
+
+        const stubRadius = 0.44;
+
+        appState.dnaRungStubs.forEach(stub => {
+          const aBackbone = structure.getAtomProxy(stub.anchor);
+          const aBase = structure.getAtomProxy(stub.target);
+
+          if (aBackbone && aBase) {
+            const color = parseBaseColor(stub.resname);
+            const dx = aBase.x - aBackbone.x;
+            const dy = aBase.y - aBackbone.y;
+            const dz = aBase.z - aBackbone.z;
+            const dist = Math.hypot(dx, dy, dz);
+
+            if (dist > 0.8) {
+              const ux = dx / dist, uy = dy / dist, uz = dz / dist;
+              const startX = aBackbone.x + ux * 1.2;
+              const startY = aBackbone.y + uy * 1.2;
+              const startZ = aBackbone.z + uz * 1.2;
+
+              shape.addCylinder([startX, startY, startZ], [aBase.x, aBase.y, aBase.z], color, stubRadius);
+              shape.addSphere([aBase.x, aBase.y, aBase.z], color, stubRadius);
+            }
+          }
+        });
+
+        appState.ladderShapeComp = appState.stage.addComponentFromObject(shape);
+        appState.ladderShapeComp.addRepresentation("buffer", {
+          opacity: bgOpacity
+        });
+      }
+
+      // 4. 鋅離子 (spacefill)
       appState.component.addRepresentation('spacefill', {
         sele: '_ZN or :ZN or [ZN] or zinc',
         color: '#94a3b8',
@@ -490,7 +647,7 @@
         opacity: bgOpacity
       });
 
-      // 4. 特寫模式：K114 與 DG82 棒狀高亮與即時動態距離
+      // 5. 特寫模式：K114 與 DG82 棒狀呈現 + 動態鍵結
       if (appState.isFocusMode) {
         const pairSele = `(${appState.actualKResnoInPdb} and protein) or (${appState.actualDGResnoInPdb} and not protein)`;
 
@@ -503,7 +660,7 @@
           opacity: 1.0
         });
 
-        // 動態鍵結虛線與距離 (Å)
+        // 只有在 <= 3.5 Å 成鍵時才顯示虛線與數值
         if (appState.dynamicPairs.length > 0) {
           appState.component.addRepresentation('distance', {
             atomPair: appState.dynamicPairs,
@@ -519,7 +676,7 @@
           });
         }
 
-        // 殘基文字標籤 (固定顯示學術標準名稱 K114 與 DG82)
+        // 殘基文字標籤
         const textShape = new NGL.Shape("focus_labels");
         const st = appState.component.structure;
 
@@ -547,7 +704,7 @@
       }
     }
 
-    // 換幀函式：動態重新計算座標與距離
+    // 換幀函式：同時重算 DNA 梯狀柱與 K114-DG82 距離
     function setFrame(targetFrame) {
       if (!appState.trajectory || !appState.component) return;
       const maxF = appState.totalFrames - 1;
@@ -556,6 +713,7 @@
       appState.currentFrame = f;
       appState.trajectory.setFrame(f);
 
+      // 動態重算鍵結
       if (appState.isFocusMode) {
         updateDynamicInteractions(appState.component.structure);
       }
@@ -621,7 +779,20 @@
       else startPlayback();
     }
 
-    // 切換 K114 - DG82 特寫視角
+    // 切換速度 (6 FPS -> 10 FPS -> 15 FPS -> 3 FPS)
+    function cyclePlaybackSpeed() {
+      const speeds = [3, 6, 10, 15];
+      const curIdx = speeds.indexOf(appState.fps);
+      const nextIdx = (curIdx + 1) % speeds.length;
+      appState.fps = speeds[nextIdx];
+      dom.speedLabel.textContent = `${appState.fps} FPS`;
+
+      if (appState.isPlaying) {
+        startPlayback(); // 重新按新速率計時
+      }
+    }
+
+    // 特寫切換
     function toggleFocus() {
       if (!appState.component) return;
       appState.isFocusMode = !appState.isFocusMode;
@@ -632,7 +803,6 @@
         updateDynamicInteractions(appState.component.structure);
         applyAllRepresentations();
         
-        // 相機平滑特寫 Zoom In
         const focusSele = `(${appState.actualKResnoInPdb} and protein) or (${appState.actualDGResnoInPdb} and not protein)`;
         appState.component.autoView(focusSele, 800);
       } else {
@@ -665,8 +835,8 @@
         });
 
         applySecondaryStructure();
-        calibrateResiduesWithW108(comp.structure);
-        
+        analyzeStructureFull(comp.structure);
+
         if (appState.isFocusMode) {
           updateDynamicInteractions(comp.structure);
         }
@@ -754,6 +924,8 @@
       dom.btnFirstFrame.addEventListener('click', () => { stopPlayback(); setFrame(0); });
       dom.btnLastFrame.addEventListener('click', () => { stopPlayback(); setFrame(appState.totalFrames - 1); });
       dom.slider.addEventListener('input', (e) => { stopPlayback(); setFrame(parseInt(e.target.value, 10)); });
+
+      dom.btnSpeed.addEventListener('click', cyclePlaybackSpeed);
 
       dom.btnLoopMode.addEventListener('click', () => {
         if (appState.loopMode === 'loop') {
