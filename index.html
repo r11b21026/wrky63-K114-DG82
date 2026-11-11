@@ -3,11 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>WRKY63 K114 - DG82 動態特寫與自動減速播放器</title>
+  <title>WRKY63 K114 - DG82 內插平滑與動態變速播放器</title>
   <!-- Tailwind CSS & Lucide Icons -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
-  <!-- NGL Viewer WebGL 引擎 (支援 .pdb.gz) -->
+  <!-- NGL Viewer WebGL 渲染引擎 -->
   <script src="https://cdn.jsdelivr.net/npm/ngl@2.0.0-dev.37/dist/ngl.js"></script>
 
   <style>
@@ -47,7 +47,7 @@
   <div id="viewport" class="w-full h-full absolute inset-0 cursor-grab active:cursor-grabbing"></div>
 
   <!-- 頂部控制列 -->
-  <header class="absolute top-3 left-3 right-3 z-20 flex items-center justify-between pointer-events-none gap-2">
+  <header class="absolute top-3 left-3 right-3 z-20 flex flex-wrap items-center justify-between pointer-events-none gap-2">
     <!-- 結構檔案選單 -->
     <div class="bg-slate-900/90 backdrop-blur-md border border-slate-700/80 rounded-xl px-3 py-1.5 flex items-center space-x-2 pointer-events-auto shadow-lg max-w-sm w-full">
       <i data-lucide="file" class="w-4 h-4 text-cyan-400 shrink-0"></i>
@@ -56,17 +56,24 @@
       </select>
     </div>
 
-    <!-- 右側功能按鍵 -->
+    <!-- 右側功能按鍵群 -->
     <div class="flex items-center space-x-2 pointer-events-auto shrink-0">
-      <!-- 自動減速開關 -->
-      <button id="btn-toggle-autoslow" class="bg-slate-900/90 backdrop-blur-md border border-cyan-500/50 hover:bg-slate-800 text-cyan-300 px-2.5 py-1.5 rounded-xl text-xs font-medium flex items-center space-x-1.5 transition shadow-lg" title="當距離接近或超過 3.5 Å 時自動進入慢動作">
+      <!-- 絕招一：平滑樣條內插開關 -->
+      <button id="btn-toggle-interpolate" class="bg-slate-900/90 backdrop-blur-md border border-cyan-500/50 hover:bg-slate-800 text-cyan-300 px-2.5 py-1.5 rounded-xl text-xs font-medium flex items-center space-x-1.5 transition shadow-lg" title="開啟 Spline 樣條內插，將 60 幀補點升級為 60 FPS 流暢動畫">
+        <i data-lucide="activity" class="w-3.5 h-3.5 text-cyan-400"></i>
+        <span>平滑內插:</span>
+        <span id="interpolate-status" class="font-bold text-emerald-400">ON</span>
+      </button>
+
+      <!-- 絕招二：動態變速開關 -->
+      <button id="btn-toggle-autoslow" class="bg-slate-900/90 backdrop-blur-md border border-cyan-500/50 hover:bg-slate-800 text-cyan-300 px-2.5 py-1.5 rounded-xl text-xs font-medium flex items-center space-x-1.5 transition shadow-lg" title="常態 30ms 極速掠過，遇越線拉伸自動 220ms 慢動作回放">
         <i data-lucide="gauge" class="w-3.5 h-3.5 text-cyan-400"></i>
-        <span>邊界自動減速:</span>
+        <span>動態變速:</span>
         <span id="autoslow-status" class="font-bold text-emerald-400">ON</span>
       </button>
 
       <!-- 特寫按鈕 -->
-      <button id="btn-focus-pair" title="特寫 K114 與 DG82" class="bg-slate-900/90 backdrop-blur-md border border-amber-500/50 hover:bg-amber-950/40 text-amber-300 px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center space-x-1.5 transition shadow-lg">
+      <button id="btn-focus-pair" title="特寫 K114 與 DG82 介面" class="bg-slate-900/90 backdrop-blur-md border border-amber-500/50 hover:bg-amber-950/40 text-amber-300 px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center space-x-1.5 transition shadow-lg">
         <i data-lucide="sparkles" class="w-4 h-4 text-amber-400"></i>
         <span id="focus-btn-text">特寫 K114 - DG82</span>
       </button>
@@ -78,8 +85,8 @@
     </div>
   </header>
 
-  <!-- 左上方 HUD：即時距離監控與自動減速狀態面板 -->
-  <div id="hud-panel" class="absolute top-16 left-3 z-20 bg-slate-900/90 backdrop-blur-md border border-slate-700/80 rounded-2xl p-3 pointer-events-none shadow-xl flex flex-col space-y-2 min-w-[210px] transition-all duration-300">
+  <!-- 左上方 HUD：即時距離與播放狀態監控面板 -->
+  <div id="hud-panel" class="absolute top-16 left-3 z-20 bg-slate-900/90 backdrop-blur-md border border-slate-700/80 rounded-2xl p-3 pointer-events-none shadow-xl flex flex-col space-y-2 min-w-[220px] transition-all duration-300">
     <div class="flex items-center justify-between border-b border-slate-800 pb-1.5">
       <span class="text-[11px] font-bold text-slate-300 flex items-center gap-1.5">
         <span id="status-indicator-dot" class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
@@ -90,16 +97,14 @@
       </span>
     </div>
 
-    <!-- 數值與動態條 -->
+    <!-- 數值與動態進度條 -->
     <div class="flex items-baseline justify-between">
       <span class="text-xs text-slate-400">即時中心距離:</span>
       <span id="hud-distance-val" class="text-lg font-mono font-bold text-emerald-400">2.82 Å</span>
     </div>
 
-    <!-- 距離進度條 (2.0 Å ~ 5.0 Å) -->
     <div class="w-full bg-slate-800 h-2 rounded-full overflow-hidden flex relative">
       <div id="hud-dist-bar" class="h-full bg-emerald-500 transition-all duration-150" style="width: 28%;"></div>
-      <!-- 門檻標記線 (3.5 Å) -->
       <div class="absolute top-0 bottom-0 left-[50%] w-0.5 bg-rose-500/80 z-10" title="3.5 Å 截斷門檻"></div>
     </div>
     <div class="flex justify-between text-[9px] font-mono text-slate-500 px-0.5">
@@ -164,12 +169,11 @@
           </button>
         </div>
 
-        <!-- 基準速度設定與當前動態速率 -->
+        <!-- 即時速度狀態標籤 -->
         <div class="flex items-center space-x-1.5">
-          <span id="active-speed-tag" class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 text-emerald-300">10 FPS</span>
-          <button id="btn-speed" class="px-2 py-0.5 rounded-lg text-[11px] font-mono bg-slate-800 border border-slate-700 text-slate-300 hover:text-cyan-300 transition" title="基準播放速度">
-            <span id="speed-label">基速: 10</span>
-          </button>
+          <span id="active-speed-tag" class="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 border border-slate-700 text-emerald-300 font-bold">
+            30 ms (常態速)
+          </span>
         </div>
       </div>
     </div>
@@ -191,22 +195,24 @@
     const appState = {
       stage: null,
       component: null,
+      trajectoryComp: null,
       trajectory: null,
       totalFrames: 1,
       currentFrame: 0,
       isPlaying: false,
-      loopMode: 'loop',
-      direction: 1,
-      timeoutId: null,
-      
-      baseFps: 10,        // 平常結合穩定時的流暢基準速度
-      slowFps: 3,         // 接近或超過 3.5 Å 門檻時的慢速觀察速度 (自動減速)
-      autoSlowdown: true, // 自動動態減速功能開關
+
+      // 兩大武器參數
+      interpolateOn: true,
+      interpolateStep: 6,      // 補 6 幀子影格，兼顧流暢度與運算效能
+      autoSlowdown: true,
+      fastTimeout: 30,         // 常態穩定快速掠過 (30 ms)
+      mediumTimeout: 80,       // 邊界拉伸 (80 ms)
+      slowTimeout: 220,        // 越線呼吸慢動作回放 (220 ms)
 
       origSS: null,
       ssSchemeIds: null,
 
-      isFocusMode: true,  // 預設開啟聚焦
+      isFocusMode: true,       // 預設特寫
       actualKResnoInPdb: null,
       actualDGResnoInPdb: null,
       dynamicPairs: [],
@@ -235,9 +241,9 @@
       btnLastFrame: document.getElementById('btn-last-frame'),
       btnLoopMode: document.getElementById('btn-loop-mode'),
       loopLabel: document.getElementById('loop-label'),
-      btnSpeed: document.getElementById('btn-speed'),
-      speedLabel: document.getElementById('speed-label'),
       activeSpeedTag: document.getElementById('active-speed-tag'),
+      btnToggleInterpolate: document.getElementById('btn-toggle-interpolate'),
+      interpolateStatus: document.getElementById('interpolate-status'),
       btnToggleAutoslow: document.getElementById('btn-toggle-autoslow'),
       autoslowStatus: document.getElementById('autoslow-status'),
       btnResetView: document.getElementById('btn-reset-view'),
@@ -524,7 +530,7 @@
     }
 
     /**
-     * 即時測距與 HUD 更新，並計算當前應該採用的動態 FPS
+     * 即時測距與 HUD 更新，並回傳推薦 timeout (ms)
      */
     function updateDynamicInteractionsAndHUD(structure) {
       appState.dynamicPairs = [];
@@ -550,7 +556,7 @@
         }
       });
 
-      if (kAtoms.length === 0 || dgAtoms.length === 0) return appState.baseFps;
+      if (kAtoms.length === 0 || dgAtoms.length === 0) return appState.fastTimeout;
 
       const nzAtom = kAtoms.find(a => a.isNZ) || kAtoms[0];
       const targetO6 = dgAtoms.find(a => a.isO6) || dgAtoms[0];
@@ -563,47 +569,47 @@
       const pct = Math.min(100, Math.max(0, ((dist - 2.0) / (5.0 - 2.0)) * 100));
       dom.hudDistBar.style.width = `${pct}%`;
 
-      let calculatedFps = appState.baseFps;
+      let recommendedTimeout = appState.fastTimeout;
 
       if (dist <= 3.2) {
-        // 穩定結合：正常基速
+        // 穩定態：30 ms 快速掠過
         dom.hudDistVal.className = 'text-lg font-mono font-bold text-emerald-400';
         dom.hudDistBar.className = 'h-full bg-emerald-500 transition-all duration-150';
         dom.hudStateBadge.className = 'text-[9px] font-mono px-1.5 py-0.5 rounded font-bold bg-emerald-950/70 border border-emerald-500/50 text-emerald-300';
         dom.hudStateBadge.textContent = '氫鍵鎖定 (Stable)';
         dom.statusIndicatorDot.className = 'w-2 h-2 rounded-full bg-emerald-400 animate-pulse';
         dom.hudPanel.classList.remove('pulse-danger');
-        calculatedFps = appState.baseFps;
+        recommendedTimeout = appState.fastTimeout;
+
+        dom.activeSpeedTag.className = 'text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 border border-slate-700 text-emerald-300 font-bold';
+        dom.activeSpeedTag.textContent = `${recommendedTimeout} ms (常態速)`;
       } else if (dist <= 3.5) {
-        // 邊界拉伸 (3.2 ~ 3.5 Å)：稍微放慢
+        // 接近邊界拉伸 (3.2 ~ 3.5 Å)：稍微減速至 80 ms
         dom.hudDistVal.className = 'text-lg font-mono font-bold text-yellow-400';
         dom.hudDistBar.className = 'h-full bg-yellow-500 transition-all duration-150';
         dom.hudStateBadge.className = 'text-[9px] font-mono px-1.5 py-0.5 rounded font-bold bg-yellow-950/70 border border-yellow-500/50 text-yellow-300';
         dom.hudStateBadge.textContent = '接近邊界 (Stretched)';
         dom.statusIndicatorDot.className = 'w-2 h-2 rounded-full bg-yellow-400';
         dom.hudPanel.classList.remove('pulse-danger');
-        calculatedFps = appState.autoSlowdown ? Math.max(appState.slowFps, Math.round(appState.baseFps * 0.6)) : appState.baseFps;
+        recommendedTimeout = appState.autoSlowdown ? appState.mediumTimeout : appState.fastTimeout;
+
+        dom.activeSpeedTag.className = 'text-[10px] font-mono px-2 py-0.5 rounded bg-yellow-950/80 border border-yellow-500/60 text-yellow-300 font-bold';
+        dom.activeSpeedTag.textContent = `${recommendedTimeout} ms (減速中)`;
       } else {
-        // 越線脫軌/呼吸 (> 3.5 Å)：強制慢動作！
+        // 越線呼吸瞬態 (> 3.5 Å)：強制慢動作 220 ms 回放！
         dom.hudDistVal.className = 'text-lg font-mono font-bold text-rose-400 animate-pulse';
         dom.hudDistBar.className = 'h-full bg-rose-500 transition-all duration-150';
         dom.hudStateBadge.className = 'text-[9px] font-mono px-1.5 py-0.5 rounded font-bold bg-rose-950/80 border border-rose-500 text-rose-300';
         dom.hudStateBadge.textContent = '暫態呼吸越線 (Excursion)';
         dom.statusIndicatorDot.className = 'w-2 h-2 rounded-full bg-rose-500 animate-ping';
         dom.hudPanel.classList.add('pulse-danger');
-        calculatedFps = appState.autoSlowdown ? appState.slowFps : appState.baseFps;
+        recommendedTimeout = appState.autoSlowdown ? appState.slowTimeout : appState.fastTimeout;
+
+        dom.activeSpeedTag.className = 'text-[10px] font-mono px-2 py-0.5 rounded bg-rose-950/80 border border-rose-500/60 text-rose-300 animate-pulse font-bold';
+        dom.activeSpeedTag.textContent = `${recommendedTimeout} ms (慢動作)`;
       }
 
-      // 更新下方速率標籤
-      if (appState.autoSlowdown && calculatedFps < appState.baseFps) {
-        dom.activeSpeedTag.className = 'text-[10px] font-mono px-1.5 py-0.5 rounded bg-rose-950/80 border border-rose-500/60 text-rose-300 animate-pulse font-bold';
-        dom.activeSpeedTag.textContent = `${calculatedFps} FPS (慢動作)`;
-      } else {
-        dom.activeSpeedTag.className = 'text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 text-emerald-300';
-        dom.activeSpeedTag.textContent = `${calculatedFps} FPS`;
-      }
-
-      return calculatedFps;
+      return recommendedTimeout;
     }
 
     function applyAllRepresentations() {
@@ -650,7 +656,7 @@
         });
       }
 
-      // 3. DNA 階梯柱狀
+      // 3. DNA 階梯柱狀 (VMD Ladder Rungs)
       if (appState.dnaRungStubs && appState.dnaRungStubs.length > 0) {
         const shape = new NGL.Shape("vmd_rungs");
         const structure = appState.component.structure;
@@ -772,44 +778,55 @@
       }
     }
 
-    // 換幀函式：回傳該幀計算出的動態 FPS
+    // 更新原生 Player 播放參數
+    function configureTrajectoryPlayer() {
+      if (!appState.trajectory || !appState.trajectory.player) return;
+
+      const player = appState.trajectory.player;
+      player.setParameters({
+        step: 1,
+        mode: "loop",
+        interpolateType: appState.interpolateOn ? "spline" : "none",
+        interpolateStep: appState.interpolateOn ? appState.interpolateStep : 1,
+        timeout: appState.fastTimeout
+      });
+    }
+
+    // 換幀函式
     function setFrame(targetFrame) {
-      if (!appState.trajectory || !appState.component) return appState.baseFps;
+      if (!appState.trajectory || !appState.component) return;
       const maxF = appState.totalFrames - 1;
       let f = Math.max(0, Math.min(targetFrame, maxF));
 
       appState.currentFrame = f;
       appState.trajectory.setFrame(f);
 
-      const dynamicFps = updateDynamicInteractionsAndHUD(appState.component.structure);
+      const nextTimeout = updateDynamicInteractionsAndHUD(appState.component.structure);
       applyAllRepresentations();
 
       dom.slider.value = f;
       dom.sliderCurr.textContent = f;
 
-      return dynamicFps;
+      // 即時微調原生播放器 timeout
+      if (appState.trajectory.player && appState.trajectory.player.parameters.timeout !== nextTimeout) {
+        appState.trajectory.player.setParameters({ timeout: nextTimeout });
+      }
     }
 
-    function stepFrame(step) {
-      if (appState.totalFrames <= 1) return appState.baseFps;
-      let next = appState.currentFrame + step;
-      const maxF = appState.totalFrames - 1;
+    function togglePlay() {
+      if (!appState.trajectory || !appState.trajectory.player) return;
+      const player = appState.trajectory.player;
 
-      if (appState.loopMode === 'loop') {
-        if (next > maxF) next = 0;
-        if (next < 0) next = maxF;
-      } else if (appState.loopMode === 'rock') {
-        if (next > maxF) { appState.direction = -1; next = maxF - 1; }
-        else if (next < 0) { appState.direction = 1; next = 1; }
-      } else if (appState.loopMode === 'once') {
-        if (next > maxF || next < 0) {
-          stopPlayback();
-          setFrame(next > maxF ? maxF : 0);
-          return appState.baseFps;
-        }
+      if (player.isPlaying) {
+        player.pause();
+        appState.isPlaying = false;
+        updatePlayIcon(false);
+      } else {
+        configureTrajectoryPlayer();
+        player.play();
+        appState.isPlaying = true;
+        updatePlayIcon(true);
       }
-
-      return setFrame(next);
     }
 
     function updatePlayIcon(playing) {
@@ -817,40 +834,6 @@
       if (!icon) return;
       icon.setAttribute('data-lucide', playing ? 'pause' : 'play');
       lucide.createIcons();
-    }
-
-    // 動態排程播放迴圈：每幀依照「即時距離」動態決定下一幀的間隔時間！
-    function scheduleNextFrame() {
-      if (!appState.isPlaying || appState.totalFrames <= 1) return;
-
-      const dynamicFps = stepFrame(appState.direction);
-      const intervalMs = Math.round(1000 / dynamicFps);
-
-      appState.timeoutId = setTimeout(() => {
-        scheduleNextFrame();
-      }, intervalMs);
-    }
-
-    function startPlayback() {
-      if (appState.totalFrames <= 1) return;
-      stopPlayback();
-      appState.isPlaying = true;
-      updatePlayIcon(true);
-      scheduleNextFrame();
-    }
-
-    function stopPlayback() {
-      appState.isPlaying = false;
-      if (appState.timeoutId) {
-        clearTimeout(appState.timeoutId);
-        appState.timeoutId = null;
-      }
-      updatePlayIcon(false);
-    }
-
-    function togglePlay() {
-      if (appState.isPlaying) stopPlayback();
-      else startPlayback();
     }
 
     function toggleFocus() {
@@ -874,7 +857,12 @@
     }
 
     async function loadPdbFile(url) {
-      stopPlayback();
+      if (appState.trajectory && appState.trajectory.player) {
+        appState.trajectory.player.pause();
+      }
+      appState.isPlaying = false;
+      updatePlayIcon(false);
+
       showLoading(`載入結構中: ${url}`);
       dom.bottomTimeline.classList.add('hidden');
 
@@ -903,7 +891,23 @@
 
         const trajComp = comp.addTrajectory();
         const trajectory = trajComp.trajectory;
+        appState.trajectoryComp = trajComp;
         appState.trajectory = trajectory;
+
+        // 綁定換幀監聽：在每幀切換時，自動計算距離並智慧調速！
+        trajectory.signals.frameChanged.add(function (frameIndex) {
+          appState.currentFrame = frameIndex;
+          dom.slider.value = frameIndex;
+          dom.sliderCurr.textContent = frameIndex;
+
+          const nextTimeout = updateDynamicInteractionsAndHUD(comp.structure);
+          applyAllRepresentations();
+
+          // 核心絕技：遇斷開/呼吸自動切換為慢動作，穩定時極速掠過
+          if (trajectory.player && trajectory.player.parameters.timeout !== nextTimeout) {
+            trajectory.player.setParameters({ timeout: nextTimeout });
+          }
+        });
 
         const handleCount = (count) => {
           if (count > 1) {
@@ -912,8 +916,10 @@
             dom.sliderTotal.textContent = String(count - 1);
             dom.bottomTimeline.classList.remove('hidden');
             dom.bottomTimeline.classList.add('flex');
+            
+            configureTrajectoryPlayer();
             setFrame(0);
-            startPlayback();
+            togglePlay(); // 自動開始流暢播放
           } else {
             appState.totalFrames = 1;
             dom.bottomTimeline.classList.add('hidden');
@@ -976,17 +982,28 @@
     function initEvents() {
       dom.fileSelector.addEventListener('change', (e) => loadPdbFile(e.target.value));
       dom.btnPlay.addEventListener('click', togglePlay);
-      dom.btnPrevFrame.addEventListener('click', () => { stopPlayback(); stepFrame(-1); });
-      dom.btnNextFrame.addEventListener('click', () => { stopPlayback(); stepFrame(1); });
-      dom.btnFirstFrame.addEventListener('click', () => { stopPlayback(); setFrame(0); });
-      dom.btnLastFrame.addEventListener('click', () => { stopPlayback(); setFrame(appState.totalFrames - 1); });
-      dom.slider.addEventListener('input', (e) => { stopPlayback(); setFrame(parseInt(e.target.value, 10)); });
 
-      dom.btnSpeed.addEventListener('click', () => {
-        const speeds = [8, 10, 15, 20];
-        const curIdx = speeds.indexOf(appState.baseFps);
-        appState.baseFps = speeds[(curIdx + 1) % speeds.length];
-        dom.speedLabel.textContent = `基速: ${appState.baseFps}`;
+      dom.btnPrevFrame.addEventListener('click', () => {
+        if (appState.trajectory && appState.trajectory.player) appState.trajectory.player.previous();
+      });
+      dom.btnNextFrame.addEventListener('click', () => {
+        if (appState.trajectory && appState.trajectory.player) appState.trajectory.player.next();
+      });
+      dom.btnFirstFrame.addEventListener('click', () => setFrame(0));
+      dom.btnLastFrame.addEventListener('click', () => setFrame(appState.totalFrames - 1));
+
+      dom.slider.addEventListener('input', (e) => {
+        if (appState.trajectory && appState.trajectory.player) appState.trajectory.player.pause();
+        appState.isPlaying = false;
+        updatePlayIcon(false);
+        setFrame(parseInt(e.target.value, 10));
+      });
+
+      dom.btnToggleInterpolate.addEventListener('click', () => {
+        appState.interpolateOn = !appState.interpolateOn;
+        dom.interpolateStatus.textContent = appState.interpolateOn ? 'ON' : 'OFF';
+        dom.interpolateStatus.className = appState.interpolateOn ? 'font-bold text-emerald-400' : 'font-bold text-slate-500';
+        configureTrajectoryPlayer();
       });
 
       dom.btnToggleAutoslow.addEventListener('click', () => {
@@ -996,16 +1013,11 @@
       });
 
       dom.btnLoopMode.addEventListener('click', () => {
-        if (appState.loopMode === 'loop') {
-          appState.loopMode = 'rock';
-          dom.loopLabel.textContent = '往返';
-        } else if (appState.loopMode === 'rock') {
-          appState.loopMode = 'once';
-          dom.loopLabel.textContent = '單次';
-        } else {
-          appState.loopMode = 'loop';
-          dom.loopLabel.textContent = '循環';
-        }
+        if (!appState.trajectory || !appState.trajectory.player) return;
+        const curMode = appState.trajectory.player.parameters.mode;
+        const nextMode = (curMode === 'loop') ? 'rock' : (curMode === 'rock' ? 'once' : 'loop');
+        appState.trajectory.player.setParameters({ mode: nextMode });
+        dom.loopLabel.textContent = nextMode === 'loop' ? '循環' : (nextMode === 'rock' ? '往返' : '單次');
       });
 
       dom.btnResetView.addEventListener('click', () => {
