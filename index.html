@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>WRKY63 K114 - DG82 內插平滑與動態變速播放器</title>
+  <title>WRKY63 左右雙分割對比分子播放器</title>
   <!-- Tailwind CSS & Lucide Icons -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
@@ -41,39 +41,63 @@
     }
   </style>
 </head>
-<body class="w-screen h-screen relative bg-[#0b0f19]">
+<body class="w-screen h-screen relative bg-[#0b0f19] flex flex-col">
 
-  <!-- 3D 渲染視窗 -->
-  <div id="viewport" class="w-full h-full absolute inset-0 cursor-grab active:cursor-grabbing"></div>
+  <!-- 3D 渲染視窗容器 (左右分割排版) -->
+  <div id="viewport-container" class="w-full h-full relative flex flex-row overflow-hidden">
+    <!-- 左側視窗 (結構 A) -->
+    <div id="viewport-a" class="w-full h-full relative cursor-grab active:cursor-grabbing transition-all duration-300">
+      <div class="absolute top-14 left-3 z-10 pointer-events-none flex items-center space-x-1.5 bg-slate-900/80 backdrop-blur-md px-2.5 py-1 rounded-lg border border-cyan-500/40 text-[11px] font-mono font-bold text-cyan-300">
+        <span class="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></span>
+        <span id="badge-title-a">視窗 A (主結構)</span>
+      </div>
+    </div>
+
+    <!-- 右側視窗 (結構 B - 左右對比時展開) -->
+    <div id="viewport-b" class="hidden w-1/2 h-full relative cursor-grab active:cursor-grabbing border-l border-slate-700/80 transition-all duration-300">
+      <div class="absolute top-14 left-3 z-10 pointer-events-none flex items-center space-x-1.5 bg-slate-900/80 backdrop-blur-md px-2.5 py-1 rounded-lg border border-amber-500/40 text-[11px] font-mono font-bold text-amber-300">
+        <span class="w-2 h-2 rounded-full bg-amber-400"></span>
+        <span id="badge-title-b">視窗 B (對比結構)</span>
+      </div>
+    </div>
+  </div>
 
   <!-- 頂部控制列 -->
   <header class="absolute top-3 left-3 right-3 z-20 flex flex-wrap items-center justify-between pointer-events-none gap-2">
-    <!-- 結構檔案選單 -->
-    <div class="bg-slate-900/90 backdrop-blur-md border border-slate-700/80 rounded-xl px-3 py-1.5 flex items-center space-x-2 pointer-events-auto shadow-lg max-w-sm w-full">
-      <i data-lucide="file" class="w-4 h-4 text-cyan-400 shrink-0"></i>
-      <select id="file-selector" class="bg-slate-800 border border-slate-700 text-cyan-200 text-xs rounded-lg px-2 py-1 w-full truncate focus:outline-none">
-        <option value="" disabled selected>搜尋結構檔案中...</option>
+    <!-- 左側：檔案 A 選單 -->
+    <div class="bg-slate-900/90 backdrop-blur-md border border-slate-700/80 rounded-xl px-2.5 py-1.5 flex items-center space-x-2 pointer-events-auto shadow-lg max-w-xs sm:max-w-sm w-full">
+      <span class="w-2.5 h-2.5 rounded-full bg-cyan-400 shrink-0" title="結構 A"></span>
+      <select id="file-selector-a" class="bg-slate-800 border border-slate-700 text-cyan-200 text-xs rounded-lg px-2 py-1 w-full truncate focus:outline-none cursor-pointer">
+        <option value="" disabled selected>搜尋檔案 A 中...</option>
+      </select>
+    </div>
+
+    <!-- 中間：右側檔案 B 選單 (開啟左右對比時呈現) -->
+    <div id="file-box-b" class="hidden bg-slate-900/90 backdrop-blur-md border border-amber-500/40 rounded-xl px-2.5 py-1.5 flex items-center space-x-2 pointer-events-auto shadow-lg max-w-xs sm:max-w-sm w-full">
+      <span class="w-2.5 h-2.5 rounded-full bg-amber-400 shrink-0" title="結構 B"></span>
+      <select id="file-selector-b" class="bg-slate-800 border border-slate-700 text-amber-200 text-xs rounded-lg px-2 py-1 w-full truncate focus:outline-none cursor-pointer">
+        <option value="" disabled selected>選擇對比檔案 B...</option>
       </select>
     </div>
 
     <!-- 右側功能按鍵群 -->
     <div class="flex items-center space-x-2 pointer-events-auto shrink-0">
-      <!-- 絕招一：平滑樣條內插開關 -->
-      <button id="btn-toggle-interpolate" class="bg-slate-900/90 backdrop-blur-md border border-cyan-500/50 hover:bg-slate-800 text-cyan-300 px-2.5 py-1.5 rounded-xl text-xs font-medium flex items-center space-x-1.5 transition shadow-lg" title="開啟 Spline 樣條內插，將 60 幀補點升級為 60 FPS 流暢動畫">
-        <i data-lucide="activity" class="w-3.5 h-3.5 text-cyan-400"></i>
-        <span>平滑內插:</span>
-        <span id="interpolate-status" class="font-bold text-emerald-400">ON</span>
+      <!-- 左右分割對比開關 (Side-by-Side Split) -->
+      <button id="btn-toggle-split" class="bg-slate-900/90 backdrop-blur-md border border-purple-500/50 hover:bg-slate-800 text-purple-300 px-2.5 py-1.5 rounded-xl text-xs font-semibold flex items-center space-x-1.5 transition shadow-lg" title="左右各放一個 PDB 同步對比">
+        <i data-lucide="columns-2" class="w-3.5 h-3.5 text-purple-400"></i>
+        <span>左右對比:</span>
+        <span id="split-status" class="font-bold text-slate-400">OFF</span>
       </button>
 
-      <!-- 絕招二：動態變速開關 -->
-      <button id="btn-toggle-autoslow" class="bg-slate-900/90 backdrop-blur-md border border-cyan-500/50 hover:bg-slate-800 text-cyan-300 px-2.5 py-1.5 rounded-xl text-xs font-medium flex items-center space-x-1.5 transition shadow-lg" title="常態 30ms 極速掠過，遇越線拉伸自動 220ms 慢動作回放">
-        <i data-lucide="gauge" class="w-3.5 h-3.5 text-cyan-400"></i>
-        <span>動態變速:</span>
-        <span id="autoslow-status" class="font-bold text-emerald-400">ON</span>
+      <!-- 視角同步旋轉開關 (Sync Camera) -->
+      <button id="btn-toggle-sync" class="hidden bg-slate-900/90 backdrop-blur-md border border-blue-500/50 hover:bg-slate-800 text-blue-300 px-2 py-1.5 rounded-xl text-xs font-medium flex items-center space-x-1 transition shadow-lg" title="左右兩視窗同步旋轉與縮放">
+        <i data-lucide="link" class="w-3.5 h-3.5 text-blue-400"></i>
+        <span class="hidden sm:inline">視角同步:</span>
+        <span id="sync-status" class="font-bold text-emerald-400">ON</span>
       </button>
 
       <!-- 特寫按鈕 -->
-      <button id="btn-focus-pair" title="特寫 K114 與 DG82 介面" class="bg-slate-900/90 backdrop-blur-md border border-amber-500/50 hover:bg-amber-950/40 text-amber-300 px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center space-x-1.5 transition shadow-lg">
+      <button id="btn-focus-pair" title="特寫 K114 與 DG82 介面" class="bg-slate-900/90 backdrop-blur-md border border-amber-500/50 hover:bg-amber-950/40 text-amber-300 px-2.5 py-1.5 rounded-xl text-xs font-semibold flex items-center space-x-1.5 transition shadow-lg">
         <i data-lucide="sparkles" class="w-4 h-4 text-amber-400"></i>
         <span id="focus-btn-text">特寫 K114 - DG82</span>
       </button>
@@ -85,8 +109,8 @@
     </div>
   </header>
 
-  <!-- 左上方 HUD：即時距離與播放狀態監控面板 -->
-  <div id="hud-panel" class="absolute top-16 left-3 z-20 bg-slate-900/90 backdrop-blur-md border border-slate-700/80 rounded-2xl p-3 pointer-events-none shadow-xl flex flex-col space-y-2 min-w-[220px] transition-all duration-300">
+  <!-- 左上方 HUD：即時距離監控面板 (左側主結構測距) -->
+  <div id="hud-panel" class="absolute top-24 left-3 z-20 bg-slate-900/90 backdrop-blur-md border border-slate-700/80 rounded-2xl p-3 pointer-events-none shadow-xl flex flex-col space-y-2 min-w-[210px] transition-all duration-300">
     <div class="flex items-center justify-between border-b border-slate-800 pb-1.5">
       <span class="text-[11px] font-bold text-slate-300 flex items-center gap-1.5">
         <span id="status-indicator-dot" class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
@@ -114,7 +138,7 @@
     </div>
   </div>
 
-  <!-- 鹼基圖例 -->
+  <!-- 鹼基圖例 (右上極簡懸浮) -->
   <div id="base-legend" class="absolute top-16 right-3 z-20 bg-slate-900/85 backdrop-blur-md border border-slate-700/70 rounded-xl px-2.5 py-1.5 pointer-events-none shadow-lg text-[10px] font-mono flex items-center gap-2">
     <span class="text-slate-400 font-bold border-r border-slate-700 pr-1.5">DNA</span>
     <div class="flex items-center space-x-1"><span class="w-2 h-2 rounded-full" style="background:#3859F2"></span><span class="text-slate-300">A</span></div>
@@ -131,7 +155,7 @@
     </div>
   </div>
 
-  <!-- 底部軌跡播放控制器 -->
+  <!-- 底部軌跡播放控制器 (同步控制左/右兩邊) -->
   <footer id="bottom-timeline" class="hidden absolute custom-bottom-timeline left-3 right-3 sm:left-12 sm:right-12 z-20 pointer-events-none flex flex-col items-center">
     <div class="bg-slate-900/95 backdrop-blur-md border border-slate-700/80 w-full max-w-lg rounded-2xl px-4 py-2.5 shadow-2xl pointer-events-auto flex flex-col gap-2">
       <!-- 幀數拉桿 -->
@@ -169,11 +193,14 @@
           </button>
         </div>
 
-        <!-- 即時速度狀態標籤 -->
+        <!-- 播放速率切換 -->
         <div class="flex items-center space-x-1.5">
           <span id="active-speed-tag" class="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 border border-slate-700 text-emerald-300 font-bold">
-            30 ms (常態速)
+            10 FPS
           </span>
+          <button id="btn-speed" class="px-2 py-0.5 rounded-lg text-[11px] font-mono bg-slate-800 border border-slate-700 text-slate-300 hover:text-cyan-300 transition" title="點擊切換速率">
+            <span id="speed-label">速度</span>
+          </button>
         </div>
       </div>
     </div>
@@ -193,41 +220,71 @@
     const STANDARD_TARGET_DG = 82;
 
     const appState = {
-      stage: null,
-      component: null,
-      trajectoryComp: null,
-      trajectory: null,
-      totalFrames: 1,
-      currentFrame: 0,
+      stageA: null,
+      stageB: null,
+      
+      // 結構 A
+      compA: null,
+      trajCompA: null,
+      trajectoryA: null,
+      totalFramesA: 1,
+      currentFrameA: 0,
+
+      // 結構 B
+      compB: null,
+      trajCompB: null,
+      trajectoryB: null,
+      totalFramesB: 1,
+
+      // 左右分割與視角同步
+      isSplitMode: false,
+      syncCamera: true,
+      isSyncingCam: false,
+
+      // 播放控制器
       isPlaying: false,
+      fps: 10,
+      loopMode: 'loop',
+      direction: 1,
+      timerId: null,
 
-      // 兩大武器參數
-      interpolateOn: true,
-      interpolateStep: 6,      // 補 6 幀子影格，兼顧流暢度與運算效能
       autoSlowdown: true,
-      fastTimeout: 30,         // 常態穩定快速掠過 (30 ms)
-      mediumTimeout: 80,       // 邊界拉伸 (80 ms)
-      slowTimeout: 220,        // 越線呼吸慢動作回放 (220 ms)
+      isFocusMode: true,
 
-      origSS: null,
-      ssSchemeIds: null,
-
-      isFocusMode: true,       // 預設特寫
-      actualKResnoInPdb: null,
-      actualDGResnoInPdb: null,
-      dynamicPairs: [],
+      actualKResnoInPdbA: null,
+      actualDGResnoInPdbA: null,
+      dynamicPairsA: [],
       currentDistance: 2.8,
-      focusLabelsComp: null,
+      focusLabelsCompA: null,
 
-      dnaStrandSelections: [],
-      dnaRungStubs: [],
-      ladderShapeComp: null
+      dnaStrandSelectionsA: [],
+      dnaRungStubsA: [],
+      ladderShapeCompA: null,
+
+      dnaStrandSelectionsB: [],
+      dnaRungStubsB: [],
+      ladderShapeCompB: null,
+
+      ssSchemeIds: null
     };
 
     lucide.createIcons();
 
     const dom = {
-      fileSelector: document.getElementById('file-selector'),
+      viewportA: document.getElementById('viewport-a'),
+      viewportB: document.getElementById('viewport-b'),
+      badgeTitleA: document.getElementById('badge-title-a'),
+      badgeTitleB: document.getElementById('badge-title-b'),
+      fileSelectorA: document.getElementById('file-selector-a'),
+      fileSelectorB: document.getElementById('file-selector-b'),
+      fileBoxB: document.getElementById('file-box-b'),
+
+      btnToggleSplit: document.getElementById('btn-toggle-split'),
+      splitStatus: document.getElementById('split-status'),
+      btnToggleSync: document.getElementById('btn-toggle-sync'),
+      syncStatus: document.getElementById('sync-status'),
+
+      baseLegend: document.getElementById('base-legend'),
       loadingOverlay: document.getElementById('loading-overlay'),
       loadingText: document.getElementById('loading-text'),
       bottomTimeline: document.getElementById('bottom-timeline'),
@@ -241,11 +298,10 @@
       btnLastFrame: document.getElementById('btn-last-frame'),
       btnLoopMode: document.getElementById('btn-loop-mode'),
       loopLabel: document.getElementById('loop-label'),
+      btnSpeed: document.getElementById('btn-speed'),
+      speedLabel: document.getElementById('speed-label'),
       activeSpeedTag: document.getElementById('active-speed-tag'),
-      btnToggleInterpolate: document.getElementById('btn-toggle-interpolate'),
-      interpolateStatus: document.getElementById('interpolate-status'),
-      btnToggleAutoslow: document.getElementById('btn-toggle-autoslow'),
-      autoslowStatus: document.getElementById('autoslow-status'),
+
       btnResetView: document.getElementById('btn-reset-view'),
       btnFocusPair: document.getElementById('btn-focus-pair'),
       focusBtnText: document.getElementById('focus-btn-text'),
@@ -410,22 +466,19 @@
       return R.map((r, k) => ({ index: r.index, ss: tri[k] }));
     }
 
-    function applySecondaryStructure() {
-      if (!appState.component) return;
-      const st = appState.component.structure;
+    function applySecondaryStructure(comp) {
+      if (!comp) return;
+      const st = comp.structure;
       const store = st.residueStore;
       if (!store || !store.sstruc) return;
-      if (!appState.origSS) appState.origSS = new Uint8Array(store.sstruc);
       try {
         const result = computeDSSP(st);
         st.eachResidue(r => { if (r.isProtein()) store.sstruc[r.index] = 'c'.charCodeAt(0); });
         result.forEach(({ index, ss }) => { store.sstruc[index] = ss.charCodeAt(0); });
-      } catch (e) {
-        store.sstruc.set(appState.origSS);
-      }
+      } catch (e) {}
     }
 
-    function analyzeStructureFull(structure) {
+    function analyzeStructureForStageA(structure) {
       const nucleicResList = [];
       const protResList = [];
       const dnaResnos = [];
@@ -433,11 +486,7 @@
       structure.eachResidue(r => {
         const rn = (r.resname || '').trim().toUpperCase();
         if (r.isProtein()) {
-          protResList.push({
-            resno: r.resno,
-            resname: rn,
-            code: AA_MAP[rn] || 'X'
-          });
+          protResList.push({ resno: r.resno, resname: rn, code: AA_MAP[rn] || 'X' });
         } else {
           const isDna = r.isNucleic() || /^(D[ATCG][35]?|[ATCG][35]?)$/.test(rn);
           if (isDna) {
@@ -446,14 +495,9 @@
             r.eachAtom(a => {
               const aname = a.atomname.trim();
               if (aname === "O3'" || aname === "O3*") o3 = { x: a.x, y: a.y, z: a.z };
-              if (aname === "P") {
-                p = { x: a.x, y: a.y, z: a.z };
-                backboneAtom = a.index;
-              }
+              if (aname === "P") { p = { x: a.x, y: a.y, z: a.z }; backboneAtom = a.index; }
               if (!backboneAtom && (aname === "C4'" || aname === "C3'" || aname === "C1'")) backboneAtom = a.index;
-              if (aname === "N1" || aname === "N3" || aname === "C4") {
-                if (!baseRing || aname === "N1" || aname === "N3") baseRing = a.index;
-              }
+              if (aname === "N1" || aname === "N3" || aname === "C4") { if (!baseRing || aname === "N1" || aname === "N3") baseRing = a.index; }
             });
             if (!backboneAtom) r.eachAtom(a => { if (!backboneAtom) backboneAtom = a.index; });
             if (!baseRing) baseRing = backboneAtom;
@@ -470,7 +514,6 @@
         }
       });
 
-      // 序列基準 W108 比對
       const seqStr = protResList.map(x => x.code).join('');
       const motifIdx = seqStr.indexOf('WRKYGQK');
 
@@ -482,18 +525,16 @@
         const sampleW = protResList.find(r => r.code === 'W');
         if (sampleW) deltaOffset = STANDARD_ANCHOR_W - sampleW.resno;
       }
-      appState.actualKResnoInPdb = STANDARD_TARGET_K - deltaOffset;
+      appState.actualKResnoInPdbA = STANDARD_TARGET_K - deltaOffset;
 
-      // DNA DG82 判定
       if (dnaResnos.includes(STANDARD_TARGET_DG)) {
-        appState.actualDGResnoInPdb = STANDARD_TARGET_DG;
+        appState.actualDGResnoInPdbA = STANDARD_TARGET_DG;
       } else if (dnaResnos.length > 0) {
-        appState.actualDGResnoInPdb = dnaResnos.find(n => n === 82) || dnaResnos[0];
+        appState.actualDGResnoInPdbA = dnaResnos.find(n => n === 82) || dnaResnos[0];
       } else {
-        appState.actualDGResnoInPdb = STANDARD_TARGET_DG;
+        appState.actualDGResnoInPdbA = STANDARD_TARGET_DG;
       }
 
-      // DNA 階梯柱狀數據建置
       if (nucleicResList.length > 0) {
         const strandGroups = [];
         let curGroup = [nucleicResList[0]];
@@ -502,9 +543,7 @@
           const r1 = nucleicResList[i];
           const r2 = nucleicResList[i + 1];
           let dist = 999;
-          if (r1.o3 && r2.p) {
-            dist = Math.hypot(r1.o3.x - r2.p.x, r1.o3.y - r2.p.y, r1.o3.z - r2.p.z);
-          }
+          if (r1.o3 && r2.p) dist = Math.hypot(r1.o3.x - r2.p.x, r1.o3.y - r2.p.y, r1.o3.z - r2.p.z);
           if (dist > 4.5 || r1.resname.endsWith('3') || r2.resname.endsWith('5')) {
             strandGroups.push(curGroup);
             curGroup = [r2];
@@ -514,13 +553,11 @@
         }
         if (curGroup.length > 0) strandGroups.push(curGroup);
 
-        appState.dnaStrandSelections = strandGroups.map(grp => {
-          const minR = grp[0].resno;
-          const maxR = grp[grp.length - 1].resno;
-          return `(${minR}-${maxR} and not protein and not hydrogen)`;
+        appState.dnaStrandSelectionsA = strandGroups.map(grp => {
+          return `(${grp[0].resno}-${grp[grp.length - 1].resno} and not protein and not hydrogen)`;
         });
 
-        appState.dnaRungStubs = nucleicResList.map(item => ({
+        appState.dnaRungStubsA = nucleicResList.map(item => ({
           anchor: item.c1Index,
           target: item.ringIndex,
           resname: item.resname,
@@ -529,23 +566,59 @@
       }
     }
 
-    /**
-     * 即時測距與 HUD 更新，並回傳推薦 timeout (ms)
-     */
+    function analyzeStructureForStageB(structure) {
+      const nucleicResList = [];
+      structure.eachResidue(r => {
+        const rn = (r.resname || '').trim().toUpperCase();
+        const isDna = r.isNucleic() || /^(D[ATCG][35]?|[ATCG][35]?)$/.test(rn);
+        if (isDna) {
+          let o3 = null, p = null, backboneAtom = null, baseRing = null;
+          r.eachAtom(a => {
+            const aname = a.atomname.trim();
+            if (aname === "O3'" || aname === "O3*") o3 = { x: a.x, y: a.y, z: a.z };
+            if (aname === "P") { p = { x: a.x, y: a.y, z: a.z }; backboneAtom = a.index; }
+            if (!backboneAtom && (aname === "C4'" || aname === "C3'" || aname === "C1'")) backboneAtom = a.index;
+            if (aname === "N1" || aname === "N3" || aname === "C4") { if (!baseRing || aname === "N1" || aname === "N3") baseRing = a.index; }
+          });
+          if (!backboneAtom) r.eachAtom(a => { if (!backboneAtom) backboneAtom = a.index; });
+          if (!baseRing) baseRing = backboneAtom;
+          nucleicResList.push({ resno: r.resno, resname: rn, o3, p, c1Index: backboneAtom, ringIndex: baseRing });
+        }
+      });
+
+      if (nucleicResList.length > 0) {
+        const strandGroups = [];
+        let curGroup = [nucleicResList[0]];
+        for (let i = 0; i < nucleicResList.length - 1; i++) {
+          const r1 = nucleicResList[i], r2 = nucleicResList[i + 1];
+          let dist = 999;
+          if (r1.o3 && r2.p) dist = Math.hypot(r1.o3.x - r2.p.x, r1.o3.y - r2.p.y, r1.o3.z - r2.p.z);
+          if (dist > 4.5 || r1.resname.endsWith('3') || r2.resname.endsWith('5')) {
+            strandGroups.push(curGroup);
+            curGroup = [r2];
+          } else curGroup.push(r2);
+        }
+        if (curGroup.length > 0) strandGroups.push(curGroup);
+
+        appState.dnaStrandSelectionsB = strandGroups.map(grp => `(${grp[0].resno}-${grp[grp.length - 1].resno} and not protein and not hydrogen)`);
+        appState.dnaRungStubsB = nucleicResList.map(item => ({ anchor: item.c1Index, target: item.ringIndex, resname: item.resname, resno: item.resno }));
+      }
+    }
+
     function updateDynamicInteractionsAndHUD(structure) {
-      appState.dynamicPairs = [];
+      appState.dynamicPairsA = [];
       const kAtoms = [];
       const dgAtoms = [];
 
       structure.eachResidue(r => {
         const rn = (r.resname || '').trim().toUpperCase();
-        if (r.resno === appState.actualKResnoInPdb && (r.isProtein() || rn === 'LYS')) {
+        if (r.resno === appState.actualKResnoInPdbA && (r.isProtein() || rn === 'LYS')) {
           r.eachAtom(a => {
             const aname = a.atomname.trim();
             kAtoms.push({ index: a.index, name: aname, x: a.x, y: a.y, z: a.z, isNZ: aname === 'NZ' });
           });
         }
-        if (r.resno === appState.actualDGResnoInPdb) {
+        if (r.resno === appState.actualDGResnoInPdbA) {
           r.eachAtom(a => {
             const aname = a.atomname.trim();
             const isTarget = (aname === 'O6' || aname === 'N7' || aname === 'OP1' || aname === 'OP2');
@@ -556,79 +629,59 @@
         }
       });
 
-      if (kAtoms.length === 0 || dgAtoms.length === 0) return appState.fastTimeout;
+      if (kAtoms.length === 0 || dgAtoms.length === 0) return;
 
       const nzAtom = kAtoms.find(a => a.isNZ) || kAtoms[0];
       const targetO6 = dgAtoms.find(a => a.isO6) || dgAtoms[0];
       const dist = Math.hypot(nzAtom.x - targetO6.x, nzAtom.y - targetO6.y, nzAtom.z - targetO6.z);
       
       appState.currentDistance = dist;
-      appState.dynamicPairs.push([nzAtom.index, targetO6.index]);
+      appState.dynamicPairsA.push([nzAtom.index, targetO6.index]);
 
       dom.hudDistVal.textContent = `${dist.toFixed(2)} Å`;
       const pct = Math.min(100, Math.max(0, ((dist - 2.0) / (5.0 - 2.0)) * 100));
       dom.hudDistBar.style.width = `${pct}%`;
 
-      let recommendedTimeout = appState.fastTimeout;
-
       if (dist <= 3.2) {
-        // 穩定態：30 ms 快速掠過
         dom.hudDistVal.className = 'text-lg font-mono font-bold text-emerald-400';
         dom.hudDistBar.className = 'h-full bg-emerald-500 transition-all duration-150';
         dom.hudStateBadge.className = 'text-[9px] font-mono px-1.5 py-0.5 rounded font-bold bg-emerald-950/70 border border-emerald-500/50 text-emerald-300';
         dom.hudStateBadge.textContent = '氫鍵鎖定 (Stable)';
         dom.statusIndicatorDot.className = 'w-2 h-2 rounded-full bg-emerald-400 animate-pulse';
         dom.hudPanel.classList.remove('pulse-danger');
-        recommendedTimeout = appState.fastTimeout;
-
-        dom.activeSpeedTag.className = 'text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 border border-slate-700 text-emerald-300 font-bold';
-        dom.activeSpeedTag.textContent = `${recommendedTimeout} ms (常態速)`;
       } else if (dist <= 3.5) {
-        // 接近邊界拉伸 (3.2 ~ 3.5 Å)：稍微減速至 80 ms
         dom.hudDistVal.className = 'text-lg font-mono font-bold text-yellow-400';
         dom.hudDistBar.className = 'h-full bg-yellow-500 transition-all duration-150';
         dom.hudStateBadge.className = 'text-[9px] font-mono px-1.5 py-0.5 rounded font-bold bg-yellow-950/70 border border-yellow-500/50 text-yellow-300';
         dom.hudStateBadge.textContent = '接近邊界 (Stretched)';
         dom.statusIndicatorDot.className = 'w-2 h-2 rounded-full bg-yellow-400';
         dom.hudPanel.classList.remove('pulse-danger');
-        recommendedTimeout = appState.autoSlowdown ? appState.mediumTimeout : appState.fastTimeout;
-
-        dom.activeSpeedTag.className = 'text-[10px] font-mono px-2 py-0.5 rounded bg-yellow-950/80 border border-yellow-500/60 text-yellow-300 font-bold';
-        dom.activeSpeedTag.textContent = `${recommendedTimeout} ms (減速中)`;
       } else {
-        // 越線呼吸瞬態 (> 3.5 Å)：強制慢動作 220 ms 回放！
         dom.hudDistVal.className = 'text-lg font-mono font-bold text-rose-400 animate-pulse';
         dom.hudDistBar.className = 'h-full bg-rose-500 transition-all duration-150';
         dom.hudStateBadge.className = 'text-[9px] font-mono px-1.5 py-0.5 rounded font-bold bg-rose-950/80 border border-rose-500 text-rose-300';
         dom.hudStateBadge.textContent = '暫態呼吸越線 (Excursion)';
         dom.statusIndicatorDot.className = 'w-2 h-2 rounded-full bg-rose-500 animate-ping';
         dom.hudPanel.classList.add('pulse-danger');
-        recommendedTimeout = appState.autoSlowdown ? appState.slowTimeout : appState.fastTimeout;
-
-        dom.activeSpeedTag.className = 'text-[10px] font-mono px-2 py-0.5 rounded bg-rose-950/80 border border-rose-500/60 text-rose-300 animate-pulse font-bold';
-        dom.activeSpeedTag.textContent = `${recommendedTimeout} ms (慢動作)`;
       }
-
-      return recommendedTimeout;
     }
 
-    function applyAllRepresentations() {
-      if (!appState.component) return;
-      appState.component.removeAllRepresentations();
+    function applyStageARepresentations() {
+      if (!appState.compA) return;
+      appState.compA.removeAllRepresentations();
 
-      if (appState.ladderShapeComp) {
-        appState.stage.removeComponent(appState.ladderShapeComp);
-        appState.ladderShapeComp = null;
+      if (appState.ladderShapeCompA) {
+        appState.stageA.removeComponent(appState.ladderShapeCompA);
+        appState.ladderShapeCompA = null;
       }
-      if (appState.focusLabelsComp) {
-        appState.stage.removeComponent(appState.focusLabelsComp);
-        appState.focusLabelsComp = null;
+      if (appState.focusLabelsCompA) {
+        appState.stageA.removeComponent(appState.focusLabelsCompA);
+        appState.focusLabelsCompA = null;
       }
 
       const bgOpacity = appState.isFocusMode ? 0.22 : 1.0;
 
-      // 1. 蛋白質主體
-      appState.component.addRepresentation('cartoon', {
+      appState.compA.addRepresentation('cartoon', {
         sele: 'protein and not hydrogen and not (_ZN or :ZN or [ZN] or zinc)',
         colorScheme: appState.ssSchemeIds.pymol_ss,
         aspectRatio: 5,
@@ -639,10 +692,9 @@
         opacity: bgOpacity
       });
 
-      // 2. DNA 骨架
-      if (appState.dnaStrandSelections && appState.dnaStrandSelections.length > 0) {
-        appState.dnaStrandSelections.forEach(strandSele => {
-          appState.component.addRepresentation('cartoon', {
+      if (appState.dnaStrandSelectionsA && appState.dnaStrandSelectionsA.length > 0) {
+        appState.dnaStrandSelectionsA.forEach(strandSele => {
+          appState.compA.addRepresentation('cartoon', {
             sele: `${strandSele} and not protein and not (_ZN or :ZN or [ZN] or zinc)`,
             color: '#7dd3fc',
             radiusType: 'size',
@@ -656,68 +708,42 @@
         });
       }
 
-      // 3. DNA 階梯柱狀 (VMD Ladder Rungs)
-      if (appState.dnaRungStubs && appState.dnaRungStubs.length > 0) {
-        const shape = new NGL.Shape("vmd_rungs");
-        const structure = appState.component.structure;
-
-        const baseColorPalette = {
-          'A': [0.22, 0.35, 0.95],
-          'T': [0.92, 0.28, 0.35],
-          'C': [0.95, 0.58, 0.20],
-          'G': [0.15, 0.80, 0.25],
-          'U': [0.92, 0.28, 0.35]
-        };
-
-        const parseBaseColor = (rname) => {
-          const clean = (rname || '').trim().toUpperCase().replace(/^D/, '').replace(/[35]$/, '');
-          return baseColorPalette[clean] || [0.8, 0.84, 0.89];
-        };
-
+      if (appState.dnaRungStubsA && appState.dnaRungStubsA.length > 0) {
+        const shape = new NGL.Shape("vmd_rungs_a");
+        const structure = appState.compA.structure;
+        const baseColorPalette = { 'A': [0.22, 0.35, 0.95], 'T': [0.92, 0.28, 0.35], 'C': [0.95, 0.58, 0.20], 'G': [0.15, 0.80, 0.25], 'U': [0.92, 0.28, 0.35] };
+        const parseBaseColor = (rname) => baseColorPalette[(rname || '').trim().toUpperCase().replace(/^D/, '').replace(/[35]$/, '')] || [0.8, 0.84, 0.89];
         const stubRadius = 0.44;
 
-        appState.dnaRungStubs.forEach(stub => {
+        appState.dnaRungStubsA.forEach(stub => {
           const aBackbone = structure.getAtomProxy(stub.anchor);
           const aBase = structure.getAtomProxy(stub.target);
-
           if (aBackbone && aBase) {
             const color = parseBaseColor(stub.resname);
-            const dx = aBase.x - aBackbone.x;
-            const dy = aBase.y - aBackbone.y;
-            const dz = aBase.z - aBackbone.z;
+            const dx = aBase.x - aBackbone.x, dy = aBase.y - aBackbone.y, dz = aBase.z - aBackbone.z;
             const dist = Math.hypot(dx, dy, dz);
-
             if (dist > 0.8) {
               const ux = dx / dist, uy = dy / dist, uz = dz / dist;
-              const startX = aBackbone.x + ux * 1.2;
-              const startY = aBackbone.y + uy * 1.2;
-              const startZ = aBackbone.z + uz * 1.2;
-
-              shape.addCylinder([startX, startY, startZ], [aBase.x, aBase.y, aBase.z], color, stubRadius);
+              shape.addCylinder([aBackbone.x + ux * 1.2, aBackbone.y + uy * 1.2, aBackbone.z + uz * 1.2], [aBase.x, aBase.y, aBase.z], color, stubRadius);
               shape.addSphere([aBase.x, aBase.y, aBase.z], color, stubRadius);
             }
           }
         });
 
-        appState.ladderShapeComp = appState.stage.addComponentFromObject(shape);
-        appState.ladderShapeComp.addRepresentation("buffer", {
-          opacity: bgOpacity
-        });
+        appState.ladderShapeCompA = appState.stageA.addComponentFromObject(shape);
+        appState.ladderShapeCompA.addRepresentation("buffer", { opacity: bgOpacity });
       }
 
-      // 4. 鋅離子
-      appState.component.addRepresentation('spacefill', {
+      appState.compA.addRepresentation('spacefill', {
         sele: '_ZN or :ZN or [ZN] or zinc',
         color: '#94a3b8',
         scale: 0.35,
         opacity: bgOpacity
       });
 
-      // 5. 特寫模式：K114 與 DG82
       if (appState.isFocusMode) {
-        const pairSele = `(${appState.actualKResnoInPdb} and protein) or (${appState.actualDGResnoInPdb} and not protein)`;
-
-        appState.component.addRepresentation('licorice', {
+        const pairSele = `(${appState.actualKResnoInPdbA} and protein) or (${appState.actualDGResnoInPdbA} and not protein)`;
+        appState.compA.addRepresentation('licorice', {
           sele: `${pairSele} and not hydrogen`,
           colorScheme: 'element',
           radius: 0.24,
@@ -725,20 +751,14 @@
           opacity: 1.0
         });
 
-        if (appState.dynamicPairs.length > 0) {
+        if (appState.dynamicPairsA.length > 0) {
           const d = appState.currentDistance;
-          let lineColor = '#22c55e';
-          let labelCol = '#86efac';
-          if (d > 3.5) {
-            lineColor = '#ef4444';
-            labelCol = '#fca5a5';
-          } else if (d > 3.2) {
-            lineColor = '#eab308';
-            labelCol = '#fef08a';
-          }
+          let lineColor = '#22c55e', labelCol = '#86efac';
+          if (d > 3.5) { lineColor = '#ef4444'; labelCol = '#fca5a5'; }
+          else if (d > 3.2) { lineColor = '#eab308'; labelCol = '#fef08a'; }
 
-          appState.component.addRepresentation('distance', {
-            atomPair: appState.dynamicPairs,
+          appState.compA.addRepresentation('distance', {
+            atomPair: appState.dynamicPairsA,
             color: lineColor,
             radius: d > 3.5 ? 0.12 : 0.08,
             dashLength: 0.2,
@@ -751,11 +771,10 @@
           });
         }
 
-        const textShape = new NGL.Shape("focus_labels");
-        const st = appState.component.structure;
-
+        const textShape = new NGL.Shape("focus_labels_a");
+        const st = appState.compA.structure;
         st.eachResidue(r => {
-          if (r.resno === appState.actualKResnoInPdb && r.isProtein()) {
+          if (r.resno === appState.actualKResnoInPdbA && r.isProtein()) {
             r.eachAtom(a => {
               if (a.atomname.trim() === 'NZ' || a.atomname.trim() === 'CA') {
                 textShape.addText([a.x, a.y + 0.9, a.z], [0.98, 0.8, 0.2], 1.3, `K${STANDARD_TARGET_K}`);
@@ -763,7 +782,7 @@
               }
             });
           }
-          if (r.resno === appState.actualDGResnoInPdb) {
+          if (r.resno === appState.actualDGResnoInPdbA) {
             r.eachAtom(a => {
               if (a.atomname.trim() === "C1'" || a.atomname.trim() === "P") {
                 textShape.addText([a.x, a.y + 0.9, a.z], [0.22, 0.74, 0.97], 1.3, `DG${STANDARD_TARGET_DG}`);
@@ -772,61 +791,155 @@
             });
           }
         });
-
-        appState.focusLabelsComp = appState.stage.addComponentFromObject(textShape);
-        appState.focusLabelsComp.addRepresentation("buffer");
+        appState.focusLabelsCompA = appState.stageA.addComponentFromObject(textShape);
+        appState.focusLabelsCompA.addRepresentation("buffer");
       }
     }
 
-    // 更新原生 Player 播放參數
-    function configureTrajectoryPlayer() {
-      if (!appState.trajectory || !appState.trajectory.player) return;
+    function applyStageBRepresentations() {
+      if (!appState.compB) return;
+      appState.compB.removeAllRepresentations();
 
-      const player = appState.trajectory.player;
-      player.setParameters({
-        step: 1,
-        mode: "loop",
-        interpolateType: appState.interpolateOn ? "spline" : "none",
-        interpolateStep: appState.interpolateOn ? appState.interpolateStep : 1,
-        timeout: appState.fastTimeout
+      if (appState.ladderShapeCompB) {
+        appState.stageB.removeComponent(appState.ladderShapeCompB);
+        appState.ladderShapeCompB = null;
+      }
+
+      appState.compB.addRepresentation('cartoon', {
+        sele: 'protein and not hydrogen',
+        color: '#f59e0b',
+        aspectRatio: 5,
+        subdiv: 12,
+        radialSegments: 20,
+        capped: true,
+        smoothSheet: true
+      });
+
+      if (appState.dnaStrandSelectionsB && appState.dnaStrandSelectionsB.length > 0) {
+        appState.dnaStrandSelectionsB.forEach(strandSele => {
+          appState.compB.addRepresentation('cartoon', {
+            sele: `${strandSele} and not protein and not hydrogen`,
+            color: '#fbbf24',
+            radiusSize: 0.55,
+            aspectRatio: 4,
+            smoothSheet: false,
+            subdiv: 12
+          });
+        });
+      } else {
+        appState.compB.addRepresentation('cartoon', {
+          sele: 'nucleic and not protein and not hydrogen',
+          color: '#fbbf24',
+          radiusSize: 0.55,
+          aspectRatio: 4,
+          smoothSheet: false,
+          subdiv: 12
+        });
+      }
+
+      if (appState.dnaRungStubsB && appState.dnaRungStubsB.length > 0) {
+        const shape = new NGL.Shape("vmd_rungs_b");
+        const structure = appState.compB.structure;
+        const baseColorPalette = { 'A': [0.22, 0.35, 0.95], 'T': [0.92, 0.28, 0.35], 'C': [0.95, 0.58, 0.20], 'G': [0.15, 0.80, 0.25], 'U': [0.92, 0.28, 0.35] };
+        const parseBaseColor = (rname) => baseColorPalette[(rname || '').trim().toUpperCase().replace(/^D/, '').replace(/[35]$/, '')] || [0.8, 0.84, 0.89];
+        const stubRadius = 0.44;
+
+        appState.dnaRungStubsB.forEach(stub => {
+          const aBackbone = structure.getAtomProxy(stub.anchor);
+          const aBase = structure.getAtomProxy(stub.target);
+          if (aBackbone && aBase) {
+            const color = parseBaseColor(stub.resname);
+            const dx = aBase.x - aBackbone.x, dy = aBase.y - aBackbone.y, dz = aBase.z - aBackbone.z;
+            const dist = Math.hypot(dx, dy, dz);
+            if (dist > 0.8) {
+              const ux = dx / dist, uy = dy / dist, uz = dz / dist;
+              shape.addCylinder([aBackbone.x + ux * 1.2, aBackbone.y + uy * 1.2, aBackbone.z + uz * 1.2], [aBase.x, aBase.y, aBase.z], color, stubRadius);
+              shape.addSphere([aBase.x, aBase.y, aBase.z], color, stubRadius);
+            }
+          }
+        });
+        appState.ladderShapeCompB = appState.stageB.addComponentFromObject(shape);
+        appState.ladderShapeCompB.addRepresentation("buffer");
+      }
+
+      appState.compB.addRepresentation('spacefill', {
+        sele: '_ZN or :ZN or [ZN] or zinc',
+        color: '#fbbf24',
+        scale: 0.35
       });
     }
 
-    // 換幀函式
     function setFrame(targetFrame) {
-      if (!appState.trajectory || !appState.component) return;
-      const maxF = appState.totalFrames - 1;
+      const maxF = appState.totalFramesA - 1;
       let f = Math.max(0, Math.min(targetFrame, maxF));
+      appState.currentFrameA = f;
 
-      appState.currentFrame = f;
-      appState.trajectory.setFrame(f);
+      if (appState.trajectoryA) {
+        appState.trajectoryA.setFrame(f);
+      }
+      if (appState.trajectoryB) {
+        const frameB = f % (appState.trajectoryB.frameCount || 1);
+        appState.trajectoryB.setFrame(frameB);
+      }
 
-      const nextTimeout = updateDynamicInteractionsAndHUD(appState.component.structure);
-      applyAllRepresentations();
+      if (appState.compA) {
+        updateDynamicInteractionsAndHUD(appState.compA.structure);
+        applyStageARepresentations();
+      }
+      if (appState.compB && appState.trajectoryB) {
+        applyStageBRepresentations();
+      }
 
       dom.slider.value = f;
       dom.sliderCurr.textContent = f;
+    }
 
-      // 即時微調原生播放器 timeout
-      if (appState.trajectory.player && appState.trajectory.player.parameters.timeout !== nextTimeout) {
-        appState.trajectory.player.setParameters({ timeout: nextTimeout });
+    function stepFrame(step) {
+      if (appState.totalFramesA <= 1) return;
+      let next = appState.currentFrameA + step;
+      const maxF = appState.totalFramesA - 1;
+
+      if (appState.loopMode === 'loop') {
+        if (next > maxF) next = 0;
+        if (next < 0) next = maxF;
+      } else if (appState.loopMode === 'rock') {
+        if (next > maxF) { appState.direction = -1; next = maxF - 1; }
+        else if (next < 0) { appState.direction = 1; next = 1; }
+      } else if (appState.loopMode === 'once') {
+        if (next > maxF || next < 0) {
+          pausePlayback();
+          setFrame(next > maxF ? maxF : 0);
+          return;
+        }
       }
+
+      setFrame(next);
+    }
+
+    function pausePlayback() {
+      appState.isPlaying = false;
+      if (appState.timerId) {
+        clearInterval(appState.timerId);
+        appState.timerId = null;
+      }
+      updatePlayIcon(false);
+    }
+
+    function startPlayback() {
+      if (appState.totalFramesA <= 1) return;
+      pausePlayback();
+      appState.isPlaying = true;
+      updatePlayIcon(true);
+
+      const intervalMs = Math.round(1000 / appState.fps);
+      appState.timerId = setInterval(() => {
+        stepFrame(appState.direction);
+      }, intervalMs);
     }
 
     function togglePlay() {
-      if (!appState.trajectory || !appState.trajectory.player) return;
-      const player = appState.trajectory.player;
-
-      if (player.isPlaying) {
-        player.pause();
-        appState.isPlaying = false;
-        updatePlayIcon(false);
-      } else {
-        configureTrajectoryPlayer();
-        player.play();
-        appState.isPlaying = true;
-        updatePlayIcon(true);
-      }
+      if (appState.isPlaying) pausePlayback();
+      else startPlayback();
     }
 
     function updatePlayIcon(playing) {
@@ -837,44 +950,40 @@
     }
 
     function toggleFocus() {
-      if (!appState.component) return;
+      if (!appState.compA) return;
       appState.isFocusMode = !appState.isFocusMode;
 
       if (appState.isFocusMode) {
         dom.btnFocusPair.classList.add('bg-amber-500/30', 'border-amber-400');
         dom.focusBtnText.textContent = '重設視角';
-        updateDynamicInteractionsAndHUD(appState.component.structure);
-        applyAllRepresentations();
+        updateDynamicInteractionsAndHUD(appState.compA.structure);
+        applyStageARepresentations();
         
-        const focusSele = `(${appState.actualKResnoInPdb} and protein) or (${appState.actualDGResnoInPdb} and not protein)`;
-        appState.component.autoView(focusSele, 800);
+        const focusSele = `(${appState.actualKResnoInPdbA} and protein) or (${appState.actualDGResnoInPdbA} and not protein)`;
+        appState.compA.autoView(focusSele, 800);
       } else {
         dom.btnFocusPair.classList.remove('bg-amber-500/30', 'border-amber-400');
         dom.focusBtnText.textContent = '特寫 K114 - DG82';
-        applyAllRepresentations();
-        appState.component.autoView(600);
+        applyStageARepresentations();
+        appState.stageA.autoView(600);
       }
     }
 
-    async function loadPdbFile(url) {
-      if (appState.trajectory && appState.trajectory.player) {
-        appState.trajectory.player.pause();
-      }
-      appState.isPlaying = false;
-      updatePlayIcon(false);
-
-      showLoading(`載入結構中: ${url}`);
+    async function loadPdbFileA(url) {
+      pausePlayback();
+      showLoading(`載入視窗 A: ${url}`);
       dom.bottomTimeline.classList.add('hidden');
 
       try {
-        appState.stage.removeAllComponents();
+        appState.stageA.removeAllComponents();
+        if (appState.ladderShapeCompA) {
+          appState.stageA.removeComponent(appState.ladderShapeCompA);
+          appState.ladderShapeCompA = null;
+        }
 
-        const comp = await appState.stage.loadFile(url, {
-          defaultRepresentation: false,
-          asTrajectory: true
-        });
-        appState.component = comp;
-        appState.origSS = null;
+        const comp = await appState.stageA.loadFile(url, { defaultRepresentation: false, asTrajectory: true });
+        appState.compA = comp;
+        dom.badgeTitleA.textContent = `視窗 A: ${url.replace(/\.pdb(\.gz)?$/i, '')}`;
 
         comp.structure.eachResidue(r => {
           const rn = (r.resname || '').trim().toUpperCase();
@@ -882,46 +991,29 @@
           if (rn === 'HIE' || rn === 'HID' || rn === 'HIP') r.resname = 'HIS';
         });
 
-        applySecondaryStructure();
-        analyzeStructureFull(comp.structure);
+        applySecondaryStructure(comp);
+        analyzeStructureForStageA(comp.structure);
         updateDynamicInteractionsAndHUD(comp.structure);
-        applyAllRepresentations();
+        applyStageARepresentations();
         
         comp.autoView(500);
 
         const trajComp = comp.addTrajectory();
         const trajectory = trajComp.trajectory;
-        appState.trajectoryComp = trajComp;
-        appState.trajectory = trajectory;
-
-        // 綁定換幀監聽：在每幀切換時，自動計算距離並智慧調速！
-        trajectory.signals.frameChanged.add(function (frameIndex) {
-          appState.currentFrame = frameIndex;
-          dom.slider.value = frameIndex;
-          dom.sliderCurr.textContent = frameIndex;
-
-          const nextTimeout = updateDynamicInteractionsAndHUD(comp.structure);
-          applyAllRepresentations();
-
-          // 核心絕技：遇斷開/呼吸自動切換為慢動作，穩定時極速掠過
-          if (trajectory.player && trajectory.player.parameters.timeout !== nextTimeout) {
-            trajectory.player.setParameters({ timeout: nextTimeout });
-          }
-        });
+        appState.trajCompA = trajComp;
+        appState.trajectoryA = trajectory;
 
         const handleCount = (count) => {
           if (count > 1) {
-            appState.totalFrames = count;
+            appState.totalFramesA = count;
             dom.slider.max = count - 1;
             dom.sliderTotal.textContent = String(count - 1);
             dom.bottomTimeline.classList.remove('hidden');
             dom.bottomTimeline.classList.add('flex');
-            
-            configureTrajectoryPlayer();
             setFrame(0);
-            togglePlay(); // 自動開始流暢播放
+            startPlayback();
           } else {
-            appState.totalFrames = 1;
+            appState.totalFramesA = 1;
             dom.bottomTimeline.classList.add('hidden');
             dom.bottomTimeline.classList.remove('flex');
           }
@@ -931,21 +1023,121 @@
         handleCount(trajectory.frameCount || 1);
 
       } catch (err) {
-        console.error('載入失敗:', err);
-        alert('檔案載入失敗，請確認該檔案是否存在於專案中。');
+        console.error('結構 A 載入失敗:', err);
+        alert('檔案 A 載入失敗。');
       } finally {
         hideLoading();
       }
     }
 
+    async function loadPdbFileB(url) {
+      if (!url) return;
+      showLoading(`載入視窗 B: ${url}`);
+
+      try {
+        appState.stageB.removeAllComponents();
+        if (appState.ladderShapeCompB) {
+          appState.stageB.removeComponent(appState.ladderShapeCompB);
+          appState.ladderShapeCompB = null;
+        }
+
+        const comp = await appState.stageB.loadFile(url, { defaultRepresentation: false, asTrajectory: true });
+        appState.compB = comp;
+        dom.badgeTitleB.textContent = `視窗 B: ${url.replace(/\.pdb(\.gz)?$/i, '')}`;
+
+        comp.structure.eachResidue(r => {
+          const rn = (r.resname || '').trim().toUpperCase();
+          if (rn === 'CYM') r.resname = 'CYS';
+          if (rn === 'HIE' || rn === 'HID' || rn === 'HIP') r.resname = 'HIS';
+        });
+
+        applySecondaryStructure(comp);
+        analyzeStructureForStageB(comp.structure);
+        applyStageBRepresentations();
+
+        try {
+          const trajCompB = comp.addTrajectory();
+          appState.trajCompB = trajCompB;
+          appState.trajectoryB = trajCompB.trajectory;
+        } catch (e) {}
+
+        comp.autoView(500);
+
+        if (appState.syncCamera && appState.stageA) {
+          const orient = appState.stageA.viewerControls.getOrientation();
+          appState.stageB.viewerControls.orient(orient);
+        }
+      } catch (err) {
+        console.error('結構 B 載入失敗:', err);
+        alert('對比檔案 B 載入失敗。');
+      } finally {
+        hideLoading();
+      }
+    }
+
+    function enableSplitMode() {
+      appState.isSplitMode = true;
+      dom.splitStatus.textContent = 'ON';
+      dom.splitStatus.className = 'font-bold text-purple-400';
+      dom.btnToggleSync.classList.remove('hidden');
+      dom.fileBoxB.classList.remove('hidden');
+
+      dom.viewportA.classList.remove('w-full');
+      dom.viewportA.classList.add('w-1/2');
+
+      dom.viewportB.classList.remove('hidden');
+      dom.viewportB.classList.add('w-1/2');
+
+      setTimeout(() => {
+        appState.stageA.handleResize();
+        appState.stageB.handleResize();
+        if (dom.fileSelectorB.value) {
+          loadPdbFileB(dom.fileSelectorB.value);
+        }
+      }, 50);
+    }
+
+    function disableSplitMode() {
+      appState.isSplitMode = false;
+      dom.splitStatus.textContent = 'OFF';
+      dom.splitStatus.className = 'font-bold text-slate-400';
+      dom.btnToggleSync.classList.add('hidden');
+      dom.fileBoxB.classList.add('hidden');
+
+      dom.viewportB.classList.add('hidden');
+      dom.viewportB.classList.remove('w-1/2');
+
+      dom.viewportA.classList.remove('w-1/2');
+      dom.viewportA.classList.add('w-full');
+
+      setTimeout(() => {
+        appState.stageA.handleResize();
+        if (appState.compA) appState.compA.autoView(500);
+      }, 50);
+    }
+
+    function initCameraSync() {
+      appState.stageA.viewerControls.signals.changed.add(() => {
+        if (!appState.isSplitMode || !appState.syncCamera || appState.isSyncingCam || !appState.stageB) return;
+        appState.isSyncingCam = true;
+        const orient = appState.stageA.viewerControls.getOrientation();
+        appState.stageB.viewerControls.orient(orient);
+        appState.isSyncingCam = false;
+      });
+
+      appState.stageB.viewerControls.signals.changed.add(() => {
+        if (!appState.isSplitMode || !appState.syncCamera || appState.isSyncingCam || !appState.stageA) return;
+        appState.isSyncingCam = true;
+        const orient = appState.stageB.viewerControls.getOrientation();
+        appState.stageA.viewerControls.orient(orient);
+        appState.isSyncingCam = false;
+      });
+    }
+
     async function scanFolderFiles() {
       const urlParams = new URLSearchParams(window.location.search);
       const specifiedFile = urlParams.get('file') || urlParams.get('pdb');
-      if (specifiedFile) {
-        dom.fileSelector.innerHTML = `<option value="${specifiedFile}">${specifiedFile}</option>`;
-        loadPdbFile(specifiedFile);
-        return;
-      }
+      const specifiedFileB = urlParams.get('fileB') || urlParams.get('pdbB');
 
       const hostname = window.location.hostname;
       const pathname = window.location.pathname.replace(/^\/|\/$/g, '');
@@ -965,68 +1157,85 @@
         } catch (e) {}
       }
 
-      dom.fileSelector.innerHTML = '';
+      dom.fileSelectorA.innerHTML = '';
+      dom.fileSelectorB.innerHTML = '<option value="" disabled selected>選擇對比檔案 B...</option>';
+
       if (found.length > 0) {
         found.forEach(name => {
-          const opt = document.createElement('option');
-          opt.value = name;
-          opt.textContent = name;
-          dom.fileSelector.appendChild(opt);
+          const optA = document.createElement('option');
+          optA.value = name; optA.textContent = name;
+          dom.fileSelectorA.appendChild(optA);
+
+          const optB = document.createElement('option');
+          optB.value = name; optB.textContent = name;
+          dom.fileSelectorB.appendChild(optB);
         });
-        loadPdbFile(found[0]);
+
+        loadPdbFileA(specifiedFile || found[0]);
+        if (specifiedFileB) {
+          dom.fileSelectorB.value = specifiedFileB;
+          enableSplitMode();
+        } else if (found.length > 1) {
+          dom.fileSelectorB.value = found[1];
+        }
       } else {
-        dom.fileSelector.innerHTML = '<option value="" disabled selected>未偵測到結構檔案 (可加 ?file=檔名.pdb.gz)</option>';
+        const fallback = specifiedFile || 'model.pdb';
+        dom.fileSelectorA.innerHTML = `<option value="${fallback}">${fallback}</option>`;
+        loadPdbFileA(fallback);
       }
     }
 
     function initEvents() {
-      dom.fileSelector.addEventListener('change', (e) => loadPdbFile(e.target.value));
+      dom.fileSelectorA.addEventListener('change', (e) => loadPdbFileA(e.target.value));
+      dom.fileSelectorB.addEventListener('change', (e) => loadPdbFileB(e.target.value));
+
       dom.btnPlay.addEventListener('click', togglePlay);
 
-      dom.btnPrevFrame.addEventListener('click', () => {
-        if (appState.trajectory && appState.trajectory.player) appState.trajectory.player.previous();
-      });
-      dom.btnNextFrame.addEventListener('click', () => {
-        if (appState.trajectory && appState.trajectory.player) appState.trajectory.player.next();
-      });
-      dom.btnFirstFrame.addEventListener('click', () => setFrame(0));
-      dom.btnLastFrame.addEventListener('click', () => setFrame(appState.totalFrames - 1));
+      dom.btnPrevFrame.addEventListener('click', () => { pausePlayback(); stepFrame(-1); });
+      dom.btnNextFrame.addEventListener('click', () => { pausePlayback(); stepFrame(1); });
+      dom.btnFirstFrame.addEventListener('click', () => { pausePlayback(); setFrame(0); });
+      dom.btnLastFrame.addEventListener('click', () => { pausePlayback(); setFrame(appState.totalFramesA - 1); });
 
       dom.slider.addEventListener('input', (e) => {
-        if (appState.trajectory && appState.trajectory.player) appState.trajectory.player.pause();
-        appState.isPlaying = false;
-        updatePlayIcon(false);
+        pausePlayback();
         setFrame(parseInt(e.target.value, 10));
       });
 
-      dom.btnToggleInterpolate.addEventListener('click', () => {
-        appState.interpolateOn = !appState.interpolateOn;
-        dom.interpolateStatus.textContent = appState.interpolateOn ? 'ON' : 'OFF';
-        dom.interpolateStatus.className = appState.interpolateOn ? 'font-bold text-emerald-400' : 'font-bold text-slate-500';
-        configureTrajectoryPlayer();
+      dom.btnToggleSplit.addEventListener('click', () => {
+        if (appState.isSplitMode) disableSplitMode();
+        else enableSplitMode();
       });
 
-      dom.btnToggleAutoslow.addEventListener('click', () => {
-        appState.autoSlowdown = !appState.autoSlowdown;
-        dom.autoslowStatus.textContent = appState.autoSlowdown ? 'ON' : 'OFF';
-        dom.autoslowStatus.className = appState.autoSlowdown ? 'font-bold text-emerald-400' : 'font-bold text-slate-500';
+      dom.btnToggleSync.addEventListener('click', () => {
+        appState.syncCamera = !appState.syncCamera;
+        dom.syncStatus.textContent = appState.syncCamera ? 'ON' : 'OFF';
+        dom.syncStatus.className = appState.syncCamera ? 'font-bold text-emerald-400' : 'font-bold text-slate-500';
+      });
+
+      dom.btnSpeed.addEventListener('click', () => {
+        const speeds = [5, 10, 15, 20];
+        const curIdx = speeds.indexOf(appState.fps);
+        appState.fps = speeds[(curIdx + 1) % speeds.length];
+        dom.activeSpeedTag.textContent = `${appState.fps} FPS`;
+        if (appState.isPlaying) startPlayback();
       });
 
       dom.btnLoopMode.addEventListener('click', () => {
-        if (!appState.trajectory || !appState.trajectory.player) return;
-        const curMode = appState.trajectory.player.parameters.mode;
-        const nextMode = (curMode === 'loop') ? 'rock' : (curMode === 'rock' ? 'once' : 'loop');
-        appState.trajectory.player.setParameters({ mode: nextMode });
-        dom.loopLabel.textContent = nextMode === 'loop' ? '循環' : (nextMode === 'rock' ? '往返' : '單次');
+        if (appState.loopMode === 'loop') {
+          appState.loopMode = 'rock'; dom.loopLabel.textContent = '往返';
+        } else if (appState.loopMode === 'rock') {
+          appState.loopMode = 'once'; dom.loopLabel.textContent = '單次';
+        } else {
+          appState.loopMode = 'loop'; dom.loopLabel.textContent = '循環';
+        }
       });
 
       dom.btnResetView.addEventListener('click', () => {
-        if (appState.component) {
-          if (appState.isFocusMode) {
-            toggleFocus();
-          } else {
-            appState.component.autoView(500);
-          }
+        if (appState.isFocusMode) {
+          toggleFocus();
+        } else {
+          if (appState.compA) appState.compA.autoView(500);
+          if (appState.compB) appState.compB.autoView(500);
         }
       });
 
@@ -1045,21 +1254,27 @@
       registerCustomColorSchemes();
       installArrowPatch();
 
-      appState.stage = new NGL.Stage('viewport', {
+      const stageConfig = {
         backgroundColor: '#0b0f19',
         cameraType: 'perspective',
         ambientColor: 0xffffff,
         ambientIntensity: 0.55,
         lightColor: 0xffffff,
         lightIntensity: 0.95,
-        clipNear: 0,
-        clipFar: 100,
-        fogNear: 100,
-        fogFar: 100,
+        clipNear: 0, clipFar: 100, fogNear: 100, fogFar: 100,
         sampleLevel: 0
+      };
+
+      appState.stageA = new NGL.Stage('viewport-a', stageConfig);
+      appState.stageB = new NGL.Stage('viewport-b', stageConfig);
+
+      initCameraSync();
+
+      window.addEventListener('resize', () => {
+        appState.stageA.handleResize();
+        appState.stageB.handleResize();
       });
 
-      window.addEventListener('resize', () => appState.stage.handleResize());
       initEvents();
       scanFolderFiles();
     });
