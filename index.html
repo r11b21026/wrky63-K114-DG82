@@ -795,15 +795,6 @@
             atomPair: appState.dynamicPairsA, color: lineColor, radius: 0.08, dashLength: 0.2, labelUnit: 'angstrom', labelSize: 1.4, labelBackground: true, labelBackgroundColor: '#0b0f19'
           });
         }
-
-        const labelMapA = {};
-        labelMapA[appState.actualKResnoInPdbA] = `K${STANDARD_TARGET_K}`;
-        labelMapA[appState.actualDGResnoInPdbA] = `DG${STANDARD_TARGET_DG}`;
-
-        appState.compA.addRepresentation('label', {
-          sele: `(${appState.actualKResnoInPdbA} and .NZ) or (${appState.actualDGResnoInPdbA} and .O6)`,
-          labelType: 'text', labelText: labelMapA, color: '#facc15', size: 1.4, showBackground: true, backgroundColor: '#0b0f19', backgroundOpacity: 0.8
-        });
       }
     }
 
@@ -841,15 +832,6 @@
             atomPair: appState.dynamicPairsB, color: lineColorB, radius: 0.08, dashLength: 0.2, labelUnit: 'angstrom', labelSize: 1.4, labelBackground: true, labelBackgroundColor: '#0b0f19'
           });
         }
-
-        const labelMapB = {};
-        labelMapB[appState.actualKResnoInPdbB] = `K${STANDARD_TARGET_K}`;
-        labelMapB[appState.actualDGResnoInPdbB] = `DG${STANDARD_TARGET_DG}`;
-
-        appState.compB.addRepresentation('label', {
-          sele: `(${appState.actualKResnoInPdbB} and .NZ) or (${appState.actualDGResnoInPdbB} and .O6)`,
-          labelType: 'text', labelText: labelMapB, color: '#facc15', size: 1.4, showBackground: true, backgroundColor: '#0b0f19', backgroundOpacity: 0.8
-        });
       }
     }
 
