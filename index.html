@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>WRKY63 K114 - DG82 動態特寫播放器</title>
+  <title>WRKY63 K114 - DG82 動態特寫與自動減速播放器</title>
   <!-- Tailwind CSS & Lucide Icons -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
@@ -35,6 +35,10 @@
         bottom: 1.8rem;
       }
     }
+    .pulse-danger {
+      box-shadow: 0 0 15px rgba(239, 68, 68, 0.6);
+      border-color: #ef4444 !important;
+    }
   </style>
 </head>
 <body class="w-screen h-screen relative bg-[#0b0f19]">
@@ -54,6 +58,13 @@
 
     <!-- 右側功能按鍵 -->
     <div class="flex items-center space-x-2 pointer-events-auto shrink-0">
+      <!-- 自動減速開關 -->
+      <button id="btn-toggle-autoslow" class="bg-slate-900/90 backdrop-blur-md border border-cyan-500/50 hover:bg-slate-800 text-cyan-300 px-2.5 py-1.5 rounded-xl text-xs font-medium flex items-center space-x-1.5 transition shadow-lg" title="當距離接近或超過 3.5 Å 時自動進入慢動作">
+        <i data-lucide="gauge" class="w-3.5 h-3.5 text-cyan-400"></i>
+        <span>邊界自動減速:</span>
+        <span id="autoslow-status" class="font-bold text-emerald-400">ON</span>
+      </button>
+
       <!-- 特寫按鈕 -->
       <button id="btn-focus-pair" title="特寫 K114 與 DG82" class="bg-slate-900/90 backdrop-blur-md border border-amber-500/50 hover:bg-amber-950/40 text-amber-300 px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center space-x-1.5 transition shadow-lg">
         <i data-lucide="sparkles" class="w-4 h-4 text-amber-400"></i>
@@ -67,8 +78,39 @@
     </div>
   </header>
 
-  <!-- 鹼基圖例 (比照 index1，右上方極簡懸浮) -->
-  <div id="base-legend" class="absolute top-14 right-3 z-20 bg-slate-900/85 backdrop-blur-md border border-slate-700/70 rounded-xl px-2.5 py-1.5 pointer-events-none shadow-lg text-[10px] font-mono flex items-center gap-2">
+  <!-- 左上方 HUD：即時距離監控與自動減速狀態面板 -->
+  <div id="hud-panel" class="absolute top-16 left-3 z-20 bg-slate-900/90 backdrop-blur-md border border-slate-700/80 rounded-2xl p-3 pointer-events-none shadow-xl flex flex-col space-y-2 min-w-[210px] transition-all duration-300">
+    <div class="flex items-center justify-between border-b border-slate-800 pb-1.5">
+      <span class="text-[11px] font-bold text-slate-300 flex items-center gap-1.5">
+        <span id="status-indicator-dot" class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+        K114(NZ) - DG82(O6)
+      </span>
+      <span id="hud-state-badge" class="text-[9px] font-mono px-1.5 py-0.5 rounded font-bold bg-emerald-950/70 border border-emerald-500/50 text-emerald-300">
+        結合 (Stable)
+      </span>
+    </div>
+
+    <!-- 數值與動態條 -->
+    <div class="flex items-baseline justify-between">
+      <span class="text-xs text-slate-400">即時中心距離:</span>
+      <span id="hud-distance-val" class="text-lg font-mono font-bold text-emerald-400">2.82 Å</span>
+    </div>
+
+    <!-- 距離進度條 (2.0 Å ~ 5.0 Å) -->
+    <div class="w-full bg-slate-800 h-2 rounded-full overflow-hidden flex relative">
+      <div id="hud-dist-bar" class="h-full bg-emerald-500 transition-all duration-150" style="width: 28%;"></div>
+      <!-- 門檻標記線 (3.5 Å) -->
+      <div class="absolute top-0 bottom-0 left-[50%] w-0.5 bg-rose-500/80 z-10" title="3.5 Å 截斷門檻"></div>
+    </div>
+    <div class="flex justify-between text-[9px] font-mono text-slate-500 px-0.5">
+      <span>2.0 Å</span>
+      <span class="text-rose-400 font-bold">3.5 Å 門檻</span>
+      <span>5.0 Å</span>
+    </div>
+  </div>
+
+  <!-- 鹼基圖例 -->
+  <div id="base-legend" class="absolute top-16 right-3 z-20 bg-slate-900/85 backdrop-blur-md border border-slate-700/70 rounded-xl px-2.5 py-1.5 pointer-events-none shadow-lg text-[10px] font-mono flex items-center gap-2">
     <span class="text-slate-400 font-bold border-r border-slate-700 pr-1.5">DNA</span>
     <div class="flex items-center space-x-1"><span class="w-2 h-2 rounded-full" style="background:#3859F2"></span><span class="text-slate-300">A</span></div>
     <div class="flex items-center space-x-1"><span class="w-2 h-2 rounded-full" style="background:#EB4759"></span><span class="text-slate-300">T</span></div>
@@ -122,10 +164,11 @@
           </button>
         </div>
 
-        <!-- 播放速率切換 (針對 60 幀左右調降速度) -->
-        <div class="flex items-center space-x-1">
-          <button id="btn-speed" class="px-2 py-0.5 rounded-lg text-[11px] font-mono bg-slate-800 border border-slate-700 text-slate-300 hover:text-cyan-300 transition" title="點擊切換播放速度">
-            <span id="speed-label">6 FPS</span>
+        <!-- 基準速度設定與當前動態速率 -->
+        <div class="flex items-center space-x-1.5">
+          <span id="active-speed-tag" class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 text-emerald-300">10 FPS</span>
+          <button id="btn-speed" class="px-2 py-0.5 rounded-lg text-[11px] font-mono bg-slate-800 border border-slate-700 text-slate-300 hover:text-cyan-300 transition" title="基準播放速度">
+            <span id="speed-label">基速: 10</span>
           </button>
         </div>
       </div>
@@ -145,10 +188,6 @@
     const STANDARD_TARGET_K = 114;
     const STANDARD_TARGET_DG = 82;
 
-    // 氫鍵/鹽橋判斷距離閥值 (Å)
-    // 嚴格標準：重原子供體-受體距離 <= 3.5 Å，若大於此距離即視為斷開！
-    const HBOND_MAX_DISTANCE = 3.5;
-
     const appState = {
       stage: null,
       component: null,
@@ -158,19 +197,22 @@
       isPlaying: false,
       loopMode: 'loop',
       direction: 1,
-      timerId: null,
-      fps: 6, // 慢速播放預設 (6 FPS：60幀約播10秒，細微變化極清晰)
+      timeoutId: null,
+      
+      baseFps: 10,        // 平常結合穩定時的流暢基準速度
+      slowFps: 3,         // 接近或超過 3.5 Å 門檻時的慢速觀察速度 (自動減速)
+      autoSlowdown: true, // 自動動態減速功能開關
+
       origSS: null,
       ssSchemeIds: null,
 
-      // 特寫相關狀態
-      isFocusMode: false,
+      isFocusMode: true,  // 預設開啟聚焦
       actualKResnoInPdb: null,
       actualDGResnoInPdb: null,
-      dynamicPairs: [], // 當前成鍵原子索引對
+      dynamicPairs: [],
+      currentDistance: 2.8,
       focusLabelsComp: null,
 
-      // DNA VMD 階梯柱狀相關數據
       dnaStrandSelections: [],
       dnaRungStubs: [],
       ladderShapeComp: null
@@ -195,10 +237,17 @@
       loopLabel: document.getElementById('loop-label'),
       btnSpeed: document.getElementById('btn-speed'),
       speedLabel: document.getElementById('speed-label'),
+      activeSpeedTag: document.getElementById('active-speed-tag'),
+      btnToggleAutoslow: document.getElementById('btn-toggle-autoslow'),
+      autoslowStatus: document.getElementById('autoslow-status'),
       btnResetView: document.getElementById('btn-reset-view'),
       btnFocusPair: document.getElementById('btn-focus-pair'),
       focusBtnText: document.getElementById('focus-btn-text'),
-      baseLegend: document.getElementById('base-legend')
+      hudPanel: document.getElementById('hud-panel'),
+      hudDistVal: document.getElementById('hud-distance-val'),
+      hudDistBar: document.getElementById('hud-dist-bar'),
+      hudStateBadge: document.getElementById('hud-state-badge'),
+      statusIndicatorDot: document.getElementById('status-indicator-dot')
     };
 
     function showLoading(text) {
@@ -210,7 +259,6 @@
       dom.loadingOverlay.classList.add('opacity-0', 'pointer-events-none');
     }
 
-    // PyMOL 二級結構配色 (紅 Helix, 黃 Sheet, 綠 Loop)
     function registerCustomColorSchemes() {
       const makeSS = (helix, sheet, loop) => function () {
         this.atomColor = function (atom) {
@@ -225,7 +273,6 @@
       };
     }
 
-    // β-sheet 末端立體箭頭修補
     function installArrowPatch() {
       try {
         const Cart = NGL.RepresentationRegistry.get('cartoon');
@@ -268,7 +315,6 @@
       } catch (e) {}
     }
 
-    // Kabsch-Sander DSSP 二級結構判定
     function computeDSSP(structure) {
       const R = [];
       structure.eachResidue(r => {
@@ -373,11 +419,6 @@
       }
     }
 
-    /**
-     * 比照完整版：結構深度解析
-     * 1. 以 W108 為絕對基準校準 K114
-     * 2. 解析 DNA 階梯柱狀 (VMD Ladder Rungs) 與骨架分股
-     */
     function analyzeStructureFull(structure) {
       const nucleicResList = [];
       const protResList = [];
@@ -423,7 +464,7 @@
         }
       });
 
-      // 1. 序列基準 W108 比對
+      // 序列基準 W108 比對
       const seqStr = protResList.map(x => x.code).join('');
       const motifIdx = seqStr.indexOf('WRKYGQK');
 
@@ -437,7 +478,7 @@
       }
       appState.actualKResnoInPdb = STANDARD_TARGET_K - deltaOffset;
 
-      // 2. DNA DG82 判定
+      // DNA DG82 判定
       if (dnaResnos.includes(STANDARD_TARGET_DG)) {
         appState.actualDGResnoInPdb = STANDARD_TARGET_DG;
       } else if (dnaResnos.length > 0) {
@@ -446,7 +487,7 @@
         appState.actualDGResnoInPdb = STANDARD_TARGET_DG;
       }
 
-      // 3. DNA 階梯柱狀數據建置 (Ladder Stubs)
+      // DNA 階梯柱狀數據建置
       if (nucleicResList.length > 0) {
         const strandGroups = [];
         let curGroup = [nucleicResList[0]];
@@ -483,10 +524,9 @@
     }
 
     /**
-     * 嚴格物理距離檢查：隨時間判定 K114 與 DG82 作用鍵
-     * 若距離超過 HBOND_MAX_DISTANCE (3.5 Å)，判定為斷鍵 (不繪製虛線)
+     * 即時測距與 HUD 更新，並計算當前應該採用的動態 FPS
      */
-    function updateDynamicInteractions(structure) {
+    function updateDynamicInteractionsAndHUD(structure) {
       appState.dynamicPairs = [];
       const kAtoms = [];
       const dgAtoms = [];
@@ -502,42 +542,74 @@
         if (r.resno === appState.actualDGResnoInPdb) {
           r.eachAtom(a => {
             const aname = a.atomname.trim();
-            // OP1, OP2 (磷酸主鏈) 或 O6, N7, N1 (鹼基環受體/供體)
-            const isPolarTarget = /^(OP1|OP2|O1P|O2P|O6|N7|N1|O3'|O5')$/.test(aname);
-            if (isPolarTarget) {
-              dgAtoms.push({ index: a.index, name: aname, x: a.x, y: a.y, z: a.z });
+            const isTarget = (aname === 'O6' || aname === 'N7' || aname === 'OP1' || aname === 'OP2');
+            if (isTarget) {
+              dgAtoms.push({ index: a.index, name: aname, x: a.x, y: a.y, z: a.z, isO6: aname === 'O6' });
             }
           });
         }
       });
 
-      if (kAtoms.length === 0 || dgAtoms.length === 0) return;
+      if (kAtoms.length === 0 || dgAtoms.length === 0) return appState.baseFps;
 
-      // K114 側鏈帶正電的 NZ (若無則取 CA/N)
       const nzAtom = kAtoms.find(a => a.isNZ) || kAtoms[0];
-      let minTarget = null;
-      let minDist = 999;
+      const targetO6 = dgAtoms.find(a => a.isO6) || dgAtoms[0];
+      const dist = Math.hypot(nzAtom.x - targetO6.x, nzAtom.y - targetO6.y, nzAtom.z - targetO6.z);
+      
+      appState.currentDistance = dist;
+      appState.dynamicPairs.push([nzAtom.index, targetO6.index]);
 
-      dgAtoms.forEach(dga => {
-        const dist = Math.hypot(nzAtom.x - dga.x, nzAtom.y - dga.y, nzAtom.z - dga.z);
-        if (dist < minDist) {
-          minDist = dist;
-          minTarget = dga;
-        }
-      });
+      dom.hudDistVal.textContent = `${dist.toFixed(2)} Å`;
+      const pct = Math.min(100, Math.max(0, ((dist - 2.0) / (5.0 - 2.0)) * 100));
+      dom.hudDistBar.style.width = `${pct}%`;
 
-      // 嚴格閥值：只有小於等於 3.5 Å 才有成鍵！超過 3.5 Å 瞬間斷開，絕不拖泥帶水
-      if (minTarget && minDist <= HBOND_MAX_DISTANCE) {
-        appState.dynamicPairs.push([nzAtom.index, minTarget.index]);
+      let calculatedFps = appState.baseFps;
+
+      if (dist <= 3.2) {
+        // 穩定結合：正常基速
+        dom.hudDistVal.className = 'text-lg font-mono font-bold text-emerald-400';
+        dom.hudDistBar.className = 'h-full bg-emerald-500 transition-all duration-150';
+        dom.hudStateBadge.className = 'text-[9px] font-mono px-1.5 py-0.5 rounded font-bold bg-emerald-950/70 border border-emerald-500/50 text-emerald-300';
+        dom.hudStateBadge.textContent = '氫鍵鎖定 (Stable)';
+        dom.statusIndicatorDot.className = 'w-2 h-2 rounded-full bg-emerald-400 animate-pulse';
+        dom.hudPanel.classList.remove('pulse-danger');
+        calculatedFps = appState.baseFps;
+      } else if (dist <= 3.5) {
+        // 邊界拉伸 (3.2 ~ 3.5 Å)：稍微放慢
+        dom.hudDistVal.className = 'text-lg font-mono font-bold text-yellow-400';
+        dom.hudDistBar.className = 'h-full bg-yellow-500 transition-all duration-150';
+        dom.hudStateBadge.className = 'text-[9px] font-mono px-1.5 py-0.5 rounded font-bold bg-yellow-950/70 border border-yellow-500/50 text-yellow-300';
+        dom.hudStateBadge.textContent = '接近邊界 (Stretched)';
+        dom.statusIndicatorDot.className = 'w-2 h-2 rounded-full bg-yellow-400';
+        dom.hudPanel.classList.remove('pulse-danger');
+        calculatedFps = appState.autoSlowdown ? Math.max(appState.slowFps, Math.round(appState.baseFps * 0.6)) : appState.baseFps;
+      } else {
+        // 越線脫軌/呼吸 (> 3.5 Å)：強制慢動作！
+        dom.hudDistVal.className = 'text-lg font-mono font-bold text-rose-400 animate-pulse';
+        dom.hudDistBar.className = 'h-full bg-rose-500 transition-all duration-150';
+        dom.hudStateBadge.className = 'text-[9px] font-mono px-1.5 py-0.5 rounded font-bold bg-rose-950/80 border border-rose-500 text-rose-300';
+        dom.hudStateBadge.textContent = '暫態呼吸越線 (Excursion)';
+        dom.statusIndicatorDot.className = 'w-2 h-2 rounded-full bg-rose-500 animate-ping';
+        dom.hudPanel.classList.add('pulse-danger');
+        calculatedFps = appState.autoSlowdown ? appState.slowFps : appState.baseFps;
       }
+
+      // 更新下方速率標籤
+      if (appState.autoSlowdown && calculatedFps < appState.baseFps) {
+        dom.activeSpeedTag.className = 'text-[10px] font-mono px-1.5 py-0.5 rounded bg-rose-950/80 border border-rose-500/60 text-rose-300 animate-pulse font-bold';
+        dom.activeSpeedTag.textContent = `${calculatedFps} FPS (慢動作)`;
+      } else {
+        dom.activeSpeedTag.className = 'text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 text-emerald-300';
+        dom.activeSpeedTag.textContent = `${calculatedFps} FPS`;
+      }
+
+      return calculatedFps;
     }
 
-    // 重繪所有 Representation (包含完整版 VMD Ladder 與特寫鍵結)
     function applyAllRepresentations() {
       if (!appState.component) return;
       appState.component.removeAllRepresentations();
 
-      // 清除先前的自訂 Shape (梯級與文字標籤)
       if (appState.ladderShapeComp) {
         appState.stage.removeComponent(appState.ladderShapeComp);
         appState.ladderShapeComp = null;
@@ -549,7 +621,7 @@
 
       const bgOpacity = appState.isFocusMode ? 0.22 : 1.0;
 
-      // 1. 蛋白質主體 (PyMOL SS 卡通)
+      // 1. 蛋白質主體
       appState.component.addRepresentation('cartoon', {
         sele: 'protein and not hydrogen and not (_ZN or :ZN or [ZN] or zinc)',
         colorScheme: appState.ssSchemeIds.pymol_ss,
@@ -561,7 +633,7 @@
         opacity: bgOpacity
       });
 
-      // 2. DNA 骨架雙螺旋卡通
+      // 2. DNA 骨架
       if (appState.dnaStrandSelections && appState.dnaStrandSelections.length > 0) {
         appState.dnaStrandSelections.forEach(strandSele => {
           appState.component.addRepresentation('cartoon', {
@@ -576,21 +648,9 @@
             opacity: bgOpacity
           });
         });
-      } else {
-        appState.component.addRepresentation('cartoon', {
-          sele: 'nucleic and not protein and not hydrogen and not (_ZN or :ZN or [ZN] or zinc)',
-          color: '#7dd3fc',
-          radiusType: 'size',
-          radiusSize: 0.55,
-          aspectRatio: 4,
-          tension: 0.3,
-          smoothSheet: false,
-          subdiv: 12,
-          opacity: bgOpacity
-        });
       }
 
-      // 3. DNA 階梯柱狀 (比照完整版 VMD Ladder Rungs，帶鹼基標準配色)
+      // 3. DNA 階梯柱狀
       if (appState.dnaRungStubs && appState.dnaRungStubs.length > 0) {
         const shape = new NGL.Shape("vmd_rungs");
         const structure = appState.component.structure;
@@ -639,7 +699,7 @@
         });
       }
 
-      // 4. 鋅離子 (spacefill)
+      // 4. 鋅離子
       appState.component.addRepresentation('spacefill', {
         sele: '_ZN or :ZN or [ZN] or zinc',
         color: '#94a3b8',
@@ -647,11 +707,10 @@
         opacity: bgOpacity
       });
 
-      // 5. 特寫模式：K114 與 DG82 棒狀呈現 + 動態鍵結
+      // 5. 特寫模式：K114 與 DG82
       if (appState.isFocusMode) {
         const pairSele = `(${appState.actualKResnoInPdb} and protein) or (${appState.actualDGResnoInPdb} and not protein)`;
 
-        // 棒狀 (Licorice) + 元素配色 CPK
         appState.component.addRepresentation('licorice', {
           sele: `${pairSele} and not hydrogen`,
           colorScheme: 'element',
@@ -660,23 +719,32 @@
           opacity: 1.0
         });
 
-        // 只有在 <= 3.5 Å 成鍵時才顯示虛線與數值
         if (appState.dynamicPairs.length > 0) {
+          const d = appState.currentDistance;
+          let lineColor = '#22c55e';
+          let labelCol = '#86efac';
+          if (d > 3.5) {
+            lineColor = '#ef4444';
+            labelCol = '#fca5a5';
+          } else if (d > 3.2) {
+            lineColor = '#eab308';
+            labelCol = '#fef08a';
+          }
+
           appState.component.addRepresentation('distance', {
             atomPair: appState.dynamicPairs,
-            color: '#facc15',
-            radius: 0.08,
+            color: lineColor,
+            radius: d > 3.5 ? 0.12 : 0.08,
             dashLength: 0.2,
             labelUnit: 'angstrom',
-            labelColor: '#fef08a',
-            labelSize: 1.3,
+            labelColor: labelCol,
+            labelSize: 1.4,
             labelBackground: true,
             labelBackgroundColor: '#0b0f19',
             labelBackgroundMargin: 0.1
           });
         }
 
-        // 殘基文字標籤
         const textShape = new NGL.Shape("focus_labels");
         const st = appState.component.structure;
 
@@ -704,28 +772,26 @@
       }
     }
 
-    // 換幀函式：同時重算 DNA 梯狀柱與 K114-DG82 距離
+    // 換幀函式：回傳該幀計算出的動態 FPS
     function setFrame(targetFrame) {
-      if (!appState.trajectory || !appState.component) return;
+      if (!appState.trajectory || !appState.component) return appState.baseFps;
       const maxF = appState.totalFrames - 1;
       let f = Math.max(0, Math.min(targetFrame, maxF));
 
       appState.currentFrame = f;
       appState.trajectory.setFrame(f);
 
-      // 動態重算鍵結
-      if (appState.isFocusMode) {
-        updateDynamicInteractions(appState.component.structure);
-      }
-
+      const dynamicFps = updateDynamicInteractionsAndHUD(appState.component.structure);
       applyAllRepresentations();
 
       dom.slider.value = f;
       dom.sliderCurr.textContent = f;
+
+      return dynamicFps;
     }
 
     function stepFrame(step) {
-      if (appState.totalFrames <= 1) return;
+      if (appState.totalFrames <= 1) return appState.baseFps;
       let next = appState.currentFrame + step;
       const maxF = appState.totalFrames - 1;
 
@@ -739,11 +805,11 @@
         if (next > maxF || next < 0) {
           stopPlayback();
           setFrame(next > maxF ? maxF : 0);
-          return;
+          return appState.baseFps;
         }
       }
 
-      setFrame(next);
+      return setFrame(next);
     }
 
     function updatePlayIcon(playing) {
@@ -753,23 +819,31 @@
       lucide.createIcons();
     }
 
+    // 動態排程播放迴圈：每幀依照「即時距離」動態決定下一幀的間隔時間！
+    function scheduleNextFrame() {
+      if (!appState.isPlaying || appState.totalFrames <= 1) return;
+
+      const dynamicFps = stepFrame(appState.direction);
+      const intervalMs = Math.round(1000 / dynamicFps);
+
+      appState.timeoutId = setTimeout(() => {
+        scheduleNextFrame();
+      }, intervalMs);
+    }
+
     function startPlayback() {
       if (appState.totalFrames <= 1) return;
       stopPlayback();
       appState.isPlaying = true;
       updatePlayIcon(true);
-
-      const intervalMs = Math.round(1000 / appState.fps);
-      appState.timerId = setInterval(() => {
-        stepFrame(appState.direction);
-      }, intervalMs);
+      scheduleNextFrame();
     }
 
     function stopPlayback() {
       appState.isPlaying = false;
-      if (appState.timerId) {
-        clearInterval(appState.timerId);
-        appState.timerId = null;
+      if (appState.timeoutId) {
+        clearTimeout(appState.timeoutId);
+        appState.timeoutId = null;
       }
       updatePlayIcon(false);
     }
@@ -779,20 +853,6 @@
       else startPlayback();
     }
 
-    // 切換速度 (6 FPS -> 10 FPS -> 15 FPS -> 3 FPS)
-    function cyclePlaybackSpeed() {
-      const speeds = [3, 6, 10, 15];
-      const curIdx = speeds.indexOf(appState.fps);
-      const nextIdx = (curIdx + 1) % speeds.length;
-      appState.fps = speeds[nextIdx];
-      dom.speedLabel.textContent = `${appState.fps} FPS`;
-
-      if (appState.isPlaying) {
-        startPlayback(); // 重新按新速率計時
-      }
-    }
-
-    // 特寫切換
     function toggleFocus() {
       if (!appState.component) return;
       appState.isFocusMode = !appState.isFocusMode;
@@ -800,7 +860,7 @@
       if (appState.isFocusMode) {
         dom.btnFocusPair.classList.add('bg-amber-500/30', 'border-amber-400');
         dom.focusBtnText.textContent = '重設視角';
-        updateDynamicInteractions(appState.component.structure);
+        updateDynamicInteractionsAndHUD(appState.component.structure);
         applyAllRepresentations();
         
         const focusSele = `(${appState.actualKResnoInPdb} and protein) or (${appState.actualDGResnoInPdb} and not protein)`;
@@ -836,12 +896,9 @@
 
         applySecondaryStructure();
         analyzeStructureFull(comp.structure);
-
-        if (appState.isFocusMode) {
-          updateDynamicInteractions(comp.structure);
-        }
-
+        updateDynamicInteractionsAndHUD(comp.structure);
         applyAllRepresentations();
+        
         comp.autoView(500);
 
         const trajComp = comp.addTrajectory();
@@ -925,7 +982,18 @@
       dom.btnLastFrame.addEventListener('click', () => { stopPlayback(); setFrame(appState.totalFrames - 1); });
       dom.slider.addEventListener('input', (e) => { stopPlayback(); setFrame(parseInt(e.target.value, 10)); });
 
-      dom.btnSpeed.addEventListener('click', cyclePlaybackSpeed);
+      dom.btnSpeed.addEventListener('click', () => {
+        const speeds = [8, 10, 15, 20];
+        const curIdx = speeds.indexOf(appState.baseFps);
+        appState.baseFps = speeds[(curIdx + 1) % speeds.length];
+        dom.speedLabel.textContent = `基速: ${appState.baseFps}`;
+      });
+
+      dom.btnToggleAutoslow.addEventListener('click', () => {
+        appState.autoSlowdown = !appState.autoSlowdown;
+        dom.autoslowStatus.textContent = appState.autoSlowdown ? 'ON' : 'OFF';
+        dom.autoslowStatus.className = appState.autoSlowdown ? 'font-bold text-emerald-400' : 'font-bold text-slate-500';
+      });
 
       dom.btnLoopMode.addEventListener('click', () => {
         if (appState.loopMode === 'loop') {
