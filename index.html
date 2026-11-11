@@ -34,7 +34,7 @@
       </div>
     </div>
 
-    <!-- 右側視窗 (結構 B) -->
+    <!-- 右側視窗 (結構 B - 左右對比時展開) -->
     <div id="viewport-b" class="hidden w-1/2 h-full relative cursor-grab active:cursor-grabbing border-l border-slate-700/80">
       <div class="absolute top-14 left-3 z-10 pointer-events-none flex items-center space-x-1.5 bg-slate-900/80 backdrop-blur-md px-2.5 py-1 rounded-lg border border-cyan-500/40 text-[11px] font-mono font-bold text-cyan-300">
         <span class="w-2 h-2 rounded-full bg-cyan-400"></span>
@@ -65,19 +65,19 @@
     </div>
 
     <div class="flex items-center space-x-2 pointer-events-auto shrink-0">
-      <button id="btn-toggle-split" class="bg-slate-900/90 backdrop-blur-md border border-purple-500/50 hover:bg-slate-800 text-purple-300 px-2.5 py-1.5 rounded-xl text-xs font-semibold flex items-center space-x-1.5 transition shadow-lg">
+      <button id="btn-toggle-split" class="bg-slate-900/90 backdrop-blur-md border border-purple-500/50 hover:bg-slate-800 text-purple-300 px-2.5 py-1.5 rounded-xl text-xs font-semibold flex items-center space-x-1.5 transition shadow-lg" title="左右各放一個 PDB 同步對比">
         <i data-lucide="columns-2" class="w-3.5 h-3.5 text-purple-400"></i>
         <span>左右對比:</span>
         <span id="split-status" class="font-bold text-slate-400">OFF</span>
       </button>
 
-      <button id="btn-toggle-sync" class="hidden bg-slate-900/90 backdrop-blur-md border border-blue-500/50 hover:bg-slate-800 text-blue-300 px-2 py-1.5 rounded-xl text-xs font-medium flex items-center space-x-1 transition shadow-lg">
+      <button id="btn-toggle-sync" class="hidden bg-slate-900/90 backdrop-blur-md border border-blue-500/50 hover:bg-slate-800 text-blue-300 px-2 py-1.5 rounded-xl text-xs font-medium flex items-center space-x-1 transition shadow-lg" title="同步視角角度">
         <i data-lucide="link" class="w-3.5 h-3.5 text-blue-400"></i>
         <span class="hidden sm:inline">視角同步:</span>
         <span id="sync-status" class="font-bold text-emerald-400">ON</span>
       </button>
 
-      <button id="btn-toggle-interpolate" class="bg-slate-900/90 backdrop-blur-md border border-cyan-500/50 hover:bg-slate-800 text-cyan-300 px-2.5 py-1.5 rounded-xl text-xs font-medium flex items-center space-x-1.5 transition shadow-lg">
+      <button id="btn-toggle-interpolate" class="bg-slate-900/90 backdrop-blur-md border border-cyan-500/50 hover:bg-slate-800 text-cyan-300 px-2.5 py-1.5 rounded-xl text-xs font-medium flex items-center space-x-1.5 transition shadow-lg" title="開啟 Spline 內插補幀">
         <i data-lucide="activity" class="w-3.5 h-3.5 text-cyan-400"></i>
         <span class="hidden sm:inline">平滑:</span>
         <span id="interpolate-status" class="font-bold text-emerald-400">ON</span>
@@ -173,7 +173,7 @@
 
         <div class="flex items-center space-x-1.5">
           <span id="active-speed-tag" class="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 border border-slate-700 text-emerald-300 font-bold">10 FPS</span>
-          <button id="btn-speed" class="px-2 py-0.5 rounded-lg text-[11px] font-mono bg-slate-800 border border-slate-700 text-slate-300 hover:text-cyan-300 transition">
+          <button id="btn-speed" class="px-2 py-0.5 rounded-lg text-[11px] font-mono bg-slate-800 border border-slate-700 text-slate-300 hover:text-cyan-300 transition" title="點擊切換速率">
             <span id="speed-label">速度</span>
           </button>
         </div>
@@ -214,8 +214,8 @@
       actualKResnoInPdbA: null, actualDGResnoInPdbA: null, dynamicPairsA: [], currentDistance: 2.8,
       actualKResnoInPdbB: null, actualDGResnoInPdbB: null, dynamicPairsB: [], currentDistanceB: 2.8,
 
-      dnaStrandSelectionsA: [], dnaRungStubsA: [], ladderShapeCompA: null,
-      dnaStrandSelectionsB: [], dnaRungStubsB: [], ladderShapeCompB: null,
+      dnaRungStubsA: [], ladderShapeCompA: null,
+      dnaRungStubsB: [], ladderShapeCompB: null,
 
       transformMatrixB: new NGL.Matrix4(),
       ssSchemeIds: null
@@ -356,24 +356,22 @@
           const isDna = r.isNucleic() || /^(D[ATCG][35]?|[ATCG][35]?)$/.test(rn);
           if (isDna) {
             dnaResnos.push(r.resno);
-            let o3 = null, p = null, backboneAtom = null, baseRing = null;
+            let backboneAtom = null, baseRing = null;
             r.eachAtom(a => {
               const aname = a.atomname.trim();
-              if (aname === "O3'" || aname === "O3*") o3 = { x: a.x, y: a.z, z: a.z };
-              if (aname === "P") { p = { x: a.x, y: a.y, z: a.z }; backboneAtom = a.index; }
+              if (aname === "P") backboneAtom = a.index;
               if (!backboneAtom && (aname === "C4'" || aname === "C3'" || aname === "C1'")) backboneAtom = a.index;
               if (aname === "N1" || aname === "N3" || aname === "C4") { if (!baseRing || aname === "N1" || aname === "N3") baseRing = a.index; }
             });
             if (!backboneAtom) r.eachAtom(a => { if (!backboneAtom) backboneAtom = a.index; });
             if (!baseRing) baseRing = backboneAtom;
-            nucleicResList.push({ resno: r.resno, chain: (r.chainname || 'A').trim(), resname: rn, o3, p, c1Index: backboneAtom, ringIndex: baseRing });
+            nucleicResList.push({ c1Index: backboneAtom, ringIndex: baseRing, resname: rn, resno: r.resno });
           }
         }
       });
 
       const seqStr = protResList.map(x => x.code).join('');
       const motifIdx = seqStr.indexOf('WRKYGQK');
-
       let deltaOffset = 0;
       if (motifIdx !== -1) deltaOffset = STANDARD_ANCHOR_W - protResList[motifIdx].resno;
       else {
@@ -390,23 +388,7 @@
         appState.actualDGResnoInPdbA = STANDARD_TARGET_DG;
       }
 
-      if (nucleicResList.length > 0) {
-        const strandGroups = [];
-        let curGroup = [nucleicResList[0]];
-        for (let i = 0; i < nucleicResList.length - 1; i++) {
-          const r1 = nucleicResList[i], r2 = nucleicResList[i + 1];
-          let dist = 999;
-          if (r1.o3 && r2.p) dist = Math.hypot(r1.o3.x - r2.p.x, r1.o3.y - r2.p.y, r1.o3.z - r2.p.z);
-          if (dist > 4.5 || r1.resname.endsWith('3') || r2.resname.endsWith('5')) {
-            strandGroups.push(curGroup);
-            curGroup = [r2];
-          } else curGroup.push(r2);
-        }
-        if (curGroup.length > 0) strandGroups.push(curGroup);
-
-        appState.dnaStrandSelectionsA = strandGroups.map(grp => `(${grp[0].resno}-${grp[grp.length - 1].resno} and not protein and not hydrogen)`);
-        appState.dnaRungStubsA = nucleicResList.map(item => ({ anchor: item.c1Index, target: item.ringIndex, resname: item.resname, resno: item.resno }));
-      }
+      appState.dnaRungStubsA = nucleicResList.map(item => ({ anchor: item.c1Index, target: item.ringIndex, resname: item.resname, resno: item.resno }));
     }
 
     function analyzeStructureForStageB(structure) {
@@ -422,17 +404,16 @@
           const isDna = r.isNucleic() || /^(D[ATCG][35]?|[ATCG][35]?)$/.test(rn);
           if (isDna) {
             dnaResnos.push(r.resno);
-            let o3 = null, p = null, backboneAtom = null, baseRing = null;
+            let backboneAtom = null, baseRing = null;
             r.eachAtom(a => {
               const aname = a.atomname.trim();
-              if (aname === "O3'" || aname === "O3*") o3 = { x: a.x, y: a.y, z: a.z };
-              if (aname === "P") { p = { x: a.x, y: a.y, z: a.z }; backboneAtom = a.index; }
+              if (aname === "P") backboneAtom = a.index;
               if (!backboneAtom && (aname === "C4'" || aname === "C3'" || aname === "C1'")) backboneAtom = a.index;
               if (aname === "N1" || aname === "N3" || aname === "C4") { if (!baseRing || aname === "N1" || aname === "N3") baseRing = a.index; }
             });
             if (!backboneAtom) r.eachAtom(a => { if (!backboneAtom) backboneAtom = a.index; });
             if (!baseRing) baseRing = backboneAtom;
-            nucleicResList.push({ resno: r.resno, chain: (r.chainname || 'A').trim(), resname: rn, o3, p, c1Index: backboneAtom, ringIndex: baseRing });
+            nucleicResList.push({ c1Index: backboneAtom, ringIndex: baseRing, resname: rn, resno: r.resno });
           }
         }
       });
@@ -455,23 +436,7 @@
         appState.actualDGResnoInPdbB = STANDARD_TARGET_DG;
       }
 
-      if (nucleicResList.length > 0) {
-        const strandGroups = [];
-        let curGroup = [nucleicResList[0]];
-        for (let i = 0; i < nucleicResList.length - 1; i++) {
-          const r1 = nucleicResList[i], r2 = nucleicResList[i + 1];
-          let dist = 999;
-          if (r1.o3 && r2.p) dist = Math.hypot(r1.o3.x - r2.p.x, r1.o3.y - r2.p.y, r1.o3.z - r2.p.z);
-          if (dist > 4.5 || r1.resname.endsWith('3') || r2.resname.endsWith('5')) {
-            strandGroups.push(curGroup);
-            curGroup = [r2];
-          } else curGroup.push(r2);
-        }
-        if (curGroup.length > 0) strandGroups.push(curGroup);
-
-        appState.dnaStrandSelectionsB = strandGroups.map(grp => `(${grp[0].resno}-${grp[grp.length - 1].resno} and not protein and not hydrogen)`);
-        appState.dnaRungStubsB = nucleicResList.map(item => ({ anchor: item.c1Index, target: item.ringIndex, resname: item.resname, resno: item.resno }));
-      }
+      appState.dnaRungStubsB = nucleicResList.map(item => ({ anchor: item.c1Index, target: item.ringIndex, resname: item.resname, resno: item.resno }));
     }
 
     function updateDynamicInteractionsAndHUD(structureA, structureB) {
@@ -549,7 +514,6 @@
       }
     }
 
-    // 獨立更新 DNA 圓柱梯級（動態跟隨雙螺旋，且不銷毀蛋白 Cartoon）
     function updateDnaRungsA() {
       if (!appState.compA || !appState.dnaRungStubsA || appState.dnaRungStubsA.length === 0) return;
       if (appState.ladderShapeCompA) {
@@ -607,13 +571,12 @@
       appState.ladderShapeCompB = appState.stageB.addComponentFromObject(shape);
       appState.ladderShapeCompB.addRepresentation("buffer", { opacity: appState.isFocusMode ? 0.22 : 1.0 });
 
-      // 【核心】：Shape 元件即時同步套用 B 結構的 4x4 仿射變換矩陣，精準咬合！
       if (appState.transformMatrixB) {
         appState.ladderShapeCompB.setTransform(appState.transformMatrixB);
       }
     }
 
-    // 繪製結構 A 表示法 (標籤改為原生 label，100% 動態跟隨原子)
+    // 繪製結構 A 表示法 (【核心修復】：改為原生 nucleic，杜絕雙螺旋被切斷吃掉)
     function applyStageARepresentations() {
       if (!appState.compA) return;
       appState.compA.removeAllRepresentations();
@@ -626,14 +589,11 @@
         aspectRatio: 5, subdiv: 12, opacity: bgOpacity
       });
 
-      if (appState.dnaStrandSelectionsA && appState.dnaStrandSelectionsA.length > 0) {
-        appState.dnaStrandSelectionsA.forEach(strandSele => {
-          appState.compA.addRepresentation('cartoon', {
-            sele: `${strandSele} and not protein and not (_ZN or :ZN or [ZN] or zinc)`,
-            color: '#7dd3fc', radiusType: 'size', radiusSize: 0.55, opacity: bgOpacity
-          });
-        });
-      }
+      // 原生 nucleic 完整識別兩條股，杜絕殘基切片導致雙股殘缺
+      appState.compA.addRepresentation('cartoon', {
+        sele: 'nucleic and not protein and not hydrogen and not (_ZN or :ZN or [ZN] or zinc)',
+        color: '#7dd3fc', radiusType: 'size', radiusSize: 0.55, opacity: bgOpacity
+      });
 
       updateDnaRungsA();
 
@@ -653,7 +613,6 @@
           });
         }
 
-        // 原生動態跟隨標籤 (隨原子即時運動)
         const labelMapA = {};
         if (appState.dynamicPairsA.length > 0) {
           labelMapA[appState.dynamicPairsA[0][0]] = `K${STANDARD_TARGET_K}`;
@@ -666,7 +625,7 @@
       }
     }
 
-    // 繪製結構 B 表示法 (標籤與距離虛線同步原生動態跟隨)
+    // 繪製結構 B 表示法
     function applyStageBRepresentations() {
       if (!appState.compB) return;
       appState.compB.removeAllRepresentations();
@@ -679,19 +638,10 @@
         aspectRatio: 5, subdiv: 12, opacity: bgOpacity
       });
 
-      if (appState.dnaStrandSelectionsB && appState.dnaStrandSelectionsB.length > 0) {
-        appState.dnaStrandSelectionsB.forEach(strandSele => {
-          appState.compB.addRepresentation('cartoon', {
-            sele: `${strandSele} and not protein and not (_ZN or :ZN or [ZN] or zinc)`,
-            color: '#7dd3fc', radiusType: 'size', radiusSize: 0.55, opacity: bgOpacity
-          });
-        });
-      } else {
-        appState.compB.addRepresentation('cartoon', {
-          sele: 'nucleic and not protein and not hydrogen and not (_ZN or :ZN or [ZN] or zinc)',
-          color: '#7dd3fc', radiusType: 'size', radiusSize: 0.55, opacity: bgOpacity
-        });
-      }
+      appState.compB.addRepresentation('cartoon', {
+        sele: 'nucleic and not protein and not hydrogen and not (_ZN or :ZN or [ZN] or zinc)',
+        color: '#7dd3fc', radiusType: 'size', radiusSize: 0.55, opacity: bgOpacity
+      });
 
       updateDnaRungsB();
 
@@ -842,7 +792,7 @@
       ];
     }
 
-    // 嚴格按殘基對齊蛋白質 C-alpha（以 W108 序列標準錨定）
+    // 按殘基對齊蛋白質 C-alpha（以 W108 序列標準錨定）
     function alignStructureBToA() {
       if (!appState.compA || !appState.compB) return;
       const sA = appState.compA.structure;
@@ -888,7 +838,6 @@
 
           appState.compB.setTransform(m4);
 
-          // 同步對齊鹼基圓柱
           if (appState.ladderShapeCompB) {
             appState.ladderShapeCompB.setTransform(m4);
           }
@@ -903,7 +852,6 @@
       }
     }
 
-    // 換幀函式：微量更新梯級圓柱與距離，極致流暢
     function setFrame(targetFrame) {
       const maxF = appState.totalFramesA - 1;
       let f = Math.max(0, Math.min(targetFrame, maxF));
@@ -923,7 +871,6 @@
       const stB = appState.compB ? appState.compB.structure : null;
       updateDynamicInteractionsAndHUD(stA, stB);
 
-      // 動態更新呼吸中的 DNA 梯級柱狀
       updateDnaRungsA();
       updateDnaRungsB();
 
@@ -949,10 +896,10 @@
           return;
         }
       }
+
       setFrame(next);
     }
 
-    // 【原生平滑化修復】：使用 NGL 內建 Player 原生驅動 Spline 樣條補間
     function pausePlayback() {
       appState.isPlaying = false;
       if (appState.trajectoryA && appState.trajectoryA.player) {
@@ -987,6 +934,7 @@
       }
     }
 
+    // 【核心修復】：兩側播放器同步驅動，解決右側不動的問題
     function startPlayback() {
       if (appState.totalFramesA <= 1) return;
       pausePlayback();
@@ -998,7 +946,7 @@
       if (appState.trajectoryA && appState.trajectoryA.player) {
         appState.trajectoryA.player.play();
       }
-      if (appState.trajectoryB && appState.trajectoryB.player) {
+      if (appState.trajectoryB && appState.trajectoryB.player && appState.totalFramesB > 1) {
         appState.trajectoryB.player.play();
       }
     }
@@ -1077,7 +1025,6 @@
         appState.trajCompA = trajComp;
         appState.trajectoryA = trajectory;
 
-        // 原生換幀監聽：更新進度條、數值與呼吸梯級
         trajectory.signals.frameChanged.add(function (frameIndex) {
           appState.currentFrameA = frameIndex;
           dom.slider.value = frameIndex;
@@ -1086,7 +1033,6 @@
           const stB = appState.compB ? appState.compB.structure : null;
           updateDynamicInteractionsAndHUD(comp.structure, stB);
           updateDnaRungsA();
-          updateDnaRungsB();
         });
 
         const handleCount = (count) => {
@@ -1148,11 +1094,22 @@
           appState.trajCompB = trajCompB;
           appState.trajectoryB = trajCompB.trajectory;
 
+          // 軌跡 B 換幀訊號：動態重算梯級與 HUD
+          trajCompB.trajectory.signals.frameChanged.add(function () {
+            updateDnaRungsB();
+            const stA = appState.compA ? appState.compA.structure : null;
+            updateDynamicInteractionsAndHUD(stA, comp.structure);
+          });
+
           const handleCountB = (count) => {
             appState.totalFramesB = count || 1;
             const typeStr = (count > 1) ? `[軌跡: ${count} 幀]` : `[單結構]`;
             dom.badgeTitleB.textContent = `視窗 B: ${url.replace(/\.pdb(\.gz)?$/i, '')} ${typeStr}`;
             configureAndSyncPlayers();
+            // 【核心修正】：若視窗 A 已在播放中，B 載入完畢後立即跟隨啟動播放！
+            if (appState.isPlaying && count > 1) {
+              trajCompB.trajectory.player.play();
+            }
           };
 
           trajCompB.trajectory.signals.countChanged.add(handleCountB);
@@ -1303,16 +1260,8 @@
 
       dom.btnPlay.addEventListener('click', togglePlay);
 
-      dom.btnPrevFrame.addEventListener('click', () => {
-        pausePlayback();
-        if (appState.trajectoryA && appState.trajectoryA.player) appState.trajectoryA.player.previous();
-        if (appState.trajectoryB && appState.trajectoryB.player) appState.trajectoryB.player.previous();
-      });
-      dom.btnNextFrame.addEventListener('click', () => {
-        pausePlayback();
-        if (appState.trajectoryA && appState.trajectoryA.player) appState.trajectoryA.player.next();
-        if (appState.trajectoryB && appState.trajectoryB.player) appState.trajectoryB.player.next();
-      });
+      dom.btnPrevFrame.addEventListener('click', () => { pausePlayback(); stepFrame(-1); });
+      dom.btnNextFrame.addEventListener('click', () => { pausePlayback(); stepFrame(1); });
       dom.btnFirstFrame.addEventListener('click', () => { pausePlayback(); setFrame(0); });
       dom.btnLastFrame.addEventListener('click', () => { pausePlayback(); setFrame(appState.totalFramesA - 1); });
 
