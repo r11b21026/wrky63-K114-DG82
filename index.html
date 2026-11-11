@@ -218,7 +218,12 @@
       dnaRungStubsB: [], ladderShapeCompB: null,
 
       transformMatrixB: new NGL.Matrix4(),
-      ssSchemeIds: null
+      ssSchemeIds: null,
+
+      // 獨立動態 representation，避免全身全刪重繪導致卡頓與閃爍
+      zincRepA: null, zincRepB: null,
+      licoriceRepA: null, licoriceRepB: null,
+      distRepA: null, distRepB: null
     };
 
     lucide.createIcons();
@@ -343,6 +348,20 @@
       } catch (e) {}
     }
 
+    // 計算三點形成的夾角 ABC (以 B 為頂點)，回傳角度 (Degree)
+    function calculateAngle(pA, pB, pC) {
+      const v1 = [pA.x - pB.x, pA.y - pB.y, pA.z - pB.z];
+      const v2 = [pC.x - pB.x, pC.y - pB.y, pC.z - pB.z];
+
+      const dot = v1[0] * v2[0] + v1[1] * v2[1] + v1[2] * v2[2];
+      const norm1 = Math.hypot(v1[0], v1[1], v1[2]);
+      const norm2 = Math.hypot(v2[0], v2[1], v2[2]);
+
+      if (norm1 < 1e-4 || norm2 < 1e-4) return 0;
+      const cosTheta = Math.max(-1, Math.min(1, dot / (norm1 * norm2)));
+      return (Math.acos(cosTheta) * 180) / Math.PI;
+    }
+
     function analyzeStructureForStageA(structure) {
       const nucleicResList = [];
       const protResList = [];
@@ -440,77 +459,243 @@
     }
 
     function updateDynamicInteractionsAndHUD(structureA, structureB) {
+      const DIST_CUTOFF = 3.5; // 最大重原子距離 3.5 Å
+
+      // --- 視窗 A 檢驗 ---
       if (structureA && appState.actualKResnoInPdbA) {
         appState.dynamicPairsA = [];
-        const kAtoms = [], dgAtoms = [];
+        let nzAtom = null, ceAtom = null, hzAtoms = [];
+        let targetO6 = null;
 
         structureA.eachResidue(r => {
           const rn = (r.resname || '').trim().toUpperCase();
           if (r.resno === appState.actualKResnoInPdbA && (r.isProtein() || rn === 'LYS')) {
-            r.eachAtom(a => { if (a.atomname.trim() === 'NZ') kAtoms.push({ index: a.index, x: a.x, y: a.y, z: a.z }); });
+            r.eachAtom(a => {
+              const an = a.atomname.trim();
+              if (an === 'NZ') nzAtom = { index: a.index, x: a.x, y: a.y, z: a.z };
+              else if (an === 'CE') ceAtom = { index: a.index, x: a.x, y: a.y, z: a.z };
+              else if (an.startsWith('HZ')) hzAtoms.push({ index: a.index, x: a.x, y: a.y, z: a.z });
+            });
           }
           if (r.resno === appState.actualDGResnoInPdbA) {
             r.eachAtom(a => {
               const an = a.atomname.trim();
-              if (an === 'O6' || an === 'N7' || an === 'OP1' || an === 'OP2') dgAtoms.push({ index: a.index, x: a.x, y: a.y, z: a.z, isO6: an === 'O6' });
+              if (an === 'O6') targetO6 = { index: a.index, x: a.x, y: a.y, z: a.z };
             });
           }
         });
 
-        if (kAtoms.length > 0 && dgAtoms.length > 0) {
-          const nzAtom = kAtoms[0];
-          const targetO6 = dgAtoms.find(a => a.isO6) || dgAtoms[0];
+        if (nzAtom && targetO6) {
           const dist = Math.hypot(nzAtom.x - targetO6.x, nzAtom.y - targetO6.y, nzAtom.z - targetO6.z);
-          
           appState.currentDistance = dist;
-          appState.dynamicPairsA.push([nzAtom.index, targetO6.index]);
+
+          let angleValid = true;
+          if (hzAtoms.length > 0) {
+            let maxAngle = 0;
+            hzAtoms.forEach(h => {
+              const ang = calculateAngle(nzAtom, h, targetO6);
+              if (ang > maxAngle) maxAngle = ang;
+            });
+            angleValid = (maxAngle >= 120.0);
+          } else if (ceAtom) {
+            angleValid = (calculateAngle(ceAtom, nzAtom, targetO6) >= 90.0);
+          }
+
+          const isBondFormed = (dist <= DIST_CUTOFF) && angleValid;
+
+          if (isBondFormed) {
+            appState.dynamicPairsA.push([nzAtom.index, targetO6.index]);
+          }
 
           dom.hudDistVal.textContent = `${dist.toFixed(2)} Å`;
           const pct = Math.min(100, Math.max(0, ((dist - 2.0) / 3.0) * 100));
           dom.hudDistBar.style.width = `${pct}%`;
 
-          if (dist <= 3.2) {
-            dom.hudDistVal.className = 'text-lg font-mono font-bold text-emerald-400';
-            dom.hudDistBar.className = 'h-full bg-emerald-500 transition-all duration-150';
-            dom.hudStateBadge.textContent = '氫鍵鎖定 (Stable)';
-          } else if (dist <= 3.5) {
-            dom.hudDistVal.className = 'text-lg font-mono font-bold text-yellow-400';
-            dom.hudDistBar.className = 'h-full bg-yellow-500 transition-all duration-150';
-            dom.hudStateBadge.textContent = '接近邊界 (Stretched)';
+          if (isBondFormed) {
+            dom.statusIndicatorDot.className = 'w-2 h-2 rounded-full bg-emerald-400 animate-pulse';
+            if (dist <= 3.2) {
+              dom.hudDistVal.className = 'text-lg font-mono font-bold text-emerald-400';
+              dom.hudDistBar.className = 'h-full bg-emerald-500 transition-all duration-150';
+              dom.hudStateBadge.textContent = '氫鍵鎖定 (Stable)';
+              dom.hudStateBadge.className = 'text-[9px] font-mono px-1.5 py-0.5 rounded font-bold bg-emerald-950/70 border border-emerald-500/50 text-emerald-300';
+            } else {
+              dom.hudDistVal.className = 'text-lg font-mono font-bold text-yellow-400';
+              dom.hudDistBar.className = 'h-full bg-yellow-500 transition-all duration-150';
+              dom.hudStateBadge.textContent = '接近邊界 (Stretched)';
+              dom.hudStateBadge.className = 'text-[9px] font-mono px-1.5 py-0.5 rounded font-bold bg-yellow-950/70 border border-yellow-500/50 text-yellow-300';
+            }
           } else {
-            dom.hudDistVal.className = 'text-lg font-mono font-bold text-rose-400 animate-pulse';
+            dom.statusIndicatorDot.className = 'w-2 h-2 rounded-full bg-rose-500';
+            dom.hudDistVal.className = 'text-lg font-mono font-bold text-rose-400';
             dom.hudDistBar.className = 'h-full bg-rose-500 transition-all duration-150';
-            dom.hudStateBadge.textContent = '暫態呼吸越線 (Excursion)';
+            dom.hudStateBadge.className = 'text-[9px] font-mono px-1.5 py-0.5 rounded font-bold bg-rose-950/70 border border-rose-500/50 text-rose-300';
+            dom.hudStateBadge.textContent = (dist > DIST_CUTOFF) ? '鍵長過長 (Broken)' : '角度不符 (Broken)';
           }
         }
       }
 
+      // --- 視窗 B 檢驗 ---
       const targetStructB = structureB || (appState.compB ? appState.compB.structure : null);
       if (targetStructB && appState.actualKResnoInPdbB && appState.actualDGResnoInPdbB) {
         appState.dynamicPairsB = [];
-        const kAtomsB = [], dgAtomsB = [];
+        let nzB = null, ceB = null, hzB = [];
+        let targetO6B = null;
 
         targetStructB.eachResidue(r => {
           const rn = (r.resname || '').trim().toUpperCase();
           if (r.resno === appState.actualKResnoInPdbB && (r.isProtein() || rn === 'LYS')) {
-            r.eachAtom(a => { if (a.atomname.trim() === 'NZ') kAtomsB.push({ index: a.index, x: a.x, y: a.y, z: a.z }); });
+            r.eachAtom(a => {
+              const an = a.atomname.trim();
+              if (an === 'NZ') nzB = { index: a.index, x: a.x, y: a.y, z: a.z };
+              else if (an === 'CE') ceB = { index: a.index, x: a.x, y: a.y, z: a.z };
+              else if (an.startsWith('HZ')) hzB.push({ index: a.index, x: a.x, y: a.y, z: a.z });
+            });
           }
           if (r.resno === appState.actualDGResnoInPdbB) {
             r.eachAtom(a => {
               const an = a.atomname.trim();
-              if (an === 'O6' || an === 'N7' || an === 'OP1' || an === 'OP2') dgAtomsB.push({ index: a.index, x: a.x, y: a.y, z: a.z, isO6: an === 'O6' });
+              if (an === 'O6') targetO6B = { index: a.index, x: a.x, y: a.y, z: a.z };
             });
           }
         });
 
-        if (kAtomsB.length > 0 && dgAtomsB.length > 0) {
-          const nzB = kAtomsB[0];
-          const tB = dgAtomsB.find(a => a.isO6) || dgAtomsB[0];
-          const distB = Math.hypot(nzB.x - tB.x, nzB.y - tB.y, nzB.z - tB.z);
+        if (nzB && targetO6B) {
+          const distB = Math.hypot(nzB.x - targetO6B.x, nzB.y - targetO6B.y, nzB.z - targetO6B.z);
           appState.currentDistanceB = distB;
-          appState.dynamicPairsB.push([nzB.index, tB.index]);
-          dom.hudBDistVal.textContent = `${distB.toFixed(2)} Å`;
+
+          let angleValidB = true;
+          if (hzB.length > 0) {
+            let maxAngle = 0;
+            hzB.forEach(h => {
+              const ang = calculateAngle(nzB, h, targetO6B);
+              if (ang > maxAngle) maxAngle = ang;
+            });
+            angleValidB = (maxAngle >= 120.0);
+          } else if (ceB) {
+            angleValidB = (calculateAngle(ceB, nzB, targetO6B) >= 90.0);
+          }
+
+          const isBondFormedB = (distB <= DIST_CUTOFF) && angleValidB;
+          if (isBondFormedB) {
+            appState.dynamicPairsB.push([nzB.index, targetO6B.index]);
+          }
+          dom.hudBDistVal.textContent = isBondFormedB ? `${distB.toFixed(2)} Å` : `${distB.toFixed(2)} Å (斷鍵)`;
+          dom.hudBDistVal.className = isBondFormedB ? 'text-emerald-400' : 'text-rose-400';
         }
+      }
+
+      // 動態更新虛線 representation
+      updateDistanceRepresentations();
+    }
+
+    // 專門更新或移除距離虛線
+    function updateDistanceRepresentations() {
+      if (!appState.isFocusMode) return;
+
+      if (appState.compA) {
+        if (appState.distRepA) {
+          appState.compA.removeRepresentation(appState.distRepA);
+          appState.distRepA = null;
+        }
+        if (appState.dynamicPairsA.length > 0) {
+          const d = appState.currentDistance;
+          let lineColor = d > 3.2 ? '#eab308' : '#22c55e';
+          appState.distRepA = appState.compA.addRepresentation('distance', {
+            atomPair: appState.dynamicPairsA, color: lineColor, radius: 0.08, dashLength: 0.2, labelUnit: 'angstrom', labelSize: 1.4, labelBackground: true, labelBackgroundColor: '#0b0f19'
+          });
+        }
+      }
+
+      if (appState.compB) {
+        if (appState.distRepB) {
+          appState.compB.removeRepresentation(appState.distRepB);
+          appState.distRepB = null;
+        }
+        if (appState.dynamicPairsB.length > 0) {
+          const dB = appState.currentDistanceB;
+          let lineColorB = dB > 3.2 ? '#eab308' : '#22c55e';
+          appState.distRepB = appState.compB.addRepresentation('distance', {
+            atomPair: appState.dynamicPairsB, color: lineColorB, radius: 0.08, dashLength: 0.2, labelUnit: 'angstrom', labelSize: 1.4, labelBackground: true, labelBackgroundColor: '#0b0f19'
+          });
+        }
+      }
+    }
+
+    // 【行動端強化】：重繪視窗 A 的鋅離子，使用 true mesh 徹底杜絕定死在螢幕
+    function updateZincA() {
+      if (!appState.compA) return;
+      if (appState.zincRepA) {
+        appState.compA.removeRepresentation(appState.zincRepA);
+        appState.zincRepA = null;
+      }
+      const bgOpacity = appState.isFocusMode ? 0.22 : 1.0;
+      appState.zincRepA = appState.compA.addRepresentation('spacefill', {
+        sele: '_ZN or :ZN or [ZN] or zinc',
+        color: '#94a3b8',
+        scale: 0.35,
+        opacity: bgOpacity,
+        disableImpostor: true, // 核心修復：關閉 Impostor Shader
+        sphereDetail: 2        // 實體 3D 幾何多邊形
+      });
+    }
+
+    // 【行動端強化】：重繪視窗 B 的鋅離子
+    function updateZincB() {
+      if (!appState.compB) return;
+      if (appState.zincRepB) {
+        appState.compB.removeRepresentation(appState.zincRepB);
+        appState.zincRepB = null;
+      }
+      const bgOpacity = appState.isFocusMode ? 0.22 : 1.0;
+      appState.zincRepB = appState.compB.addRepresentation('spacefill', {
+        sele: '_ZN or :ZN or [ZN] or zinc',
+        color: '#94a3b8',
+        scale: 0.35,
+        opacity: bgOpacity,
+        disableImpostor: true,
+        sphereDetail: 2
+      });
+    }
+
+    // 【行動端強化】：重繪視窗 A 特寫殘基 Licorice，排除擋住 stick 的 2D 圓盤
+    function updateFocusPairA() {
+      if (!appState.compA) return;
+      if (appState.licoriceRepA) {
+        appState.compA.removeRepresentation(appState.licoriceRepA);
+        appState.licoriceRepA = null;
+      }
+      if (appState.isFocusMode && appState.actualKResnoInPdbA) {
+        const pairSele = `(${appState.actualKResnoInPdbA} and protein) or (${appState.actualDGResnoInPdbA} and not protein)`;
+        appState.licoriceRepA = appState.compA.addRepresentation('licorice', {
+          sele: `${pairSele} and not hydrogen`,
+          colorScheme: 'element',
+          radius: 0.24,
+          opacity: 1.0,
+          disableImpostor: true, // 核心修復：禁用怪異圓點
+          sphereDetail: 2,       // 實體 3D 幾何接角
+          radialSegments: 10
+        });
+      }
+    }
+
+    // 【行動端強化】：重繪視窗 B 特寫殘基 Licorice
+    function updateFocusPairB() {
+      if (!appState.compB) return;
+      if (appState.licoriceRepB) {
+        appState.compB.removeRepresentation(appState.licoriceRepB);
+        appState.licoriceRepB = null;
+      }
+      if (appState.isFocusMode && appState.actualKResnoInPdbB) {
+        const pairSeleB = `(${appState.actualKResnoInPdbB} and protein) or (${appState.actualDGResnoInPdbB} and not protein)`;
+        appState.licoriceRepB = appState.compB.addRepresentation('licorice', {
+          sele: `${pairSeleB} and not hydrogen`,
+          colorScheme: 'element',
+          radius: 0.24,
+          opacity: 1.0,
+          disableImpostor: true,
+          sphereDetail: 2,
+          radialSegments: 10
+        });
       }
     }
 
@@ -576,10 +761,13 @@
       }
     }
 
-    // 繪製結構 A 表示法 (【核心修復】：改為原生 nucleic，杜絕雙螺旋被切斷吃掉)
+    // 繪製結構 A 表示法
     function applyStageARepresentations() {
       if (!appState.compA) return;
       appState.compA.removeAllRepresentations();
+      appState.distRepA = null;
+      appState.zincRepA = null;
+      appState.licoriceRepA = null;
 
       const bgOpacity = appState.isFocusMode ? 0.22 : 1.0;
 
@@ -589,35 +777,29 @@
         aspectRatio: 5, subdiv: 12, opacity: bgOpacity
       });
 
-      // 原生 nucleic 完整識別兩條股，杜絕殘基切片導致雙股殘缺
       appState.compA.addRepresentation('cartoon', {
         sele: 'nucleic and not protein and not hydrogen and not (_ZN or :ZN or [ZN] or zinc)',
         color: '#7dd3fc', radiusType: 'size', radiusSize: 0.55, opacity: bgOpacity
       });
 
       updateDnaRungsA();
-
-      appState.compA.addRepresentation('spacefill', { sele: '_ZN or :ZN or [ZN] or zinc', color: '#94a3b8', scale: 0.35, opacity: bgOpacity });
+      updateZincA();
 
       if (appState.isFocusMode && appState.actualKResnoInPdbA) {
-        const pairSele = `(${appState.actualKResnoInPdbA} and protein) or (${appState.actualDGResnoInPdbA} and not protein)`;
-        appState.compA.addRepresentation('licorice', {
-          sele: `${pairSele} and not hydrogen`, colorScheme: 'element', radius: 0.24, opacity: 1.0
-        });
+        updateFocusPairA();
 
         if (appState.dynamicPairsA.length > 0) {
           const d = appState.currentDistance;
-          let lineColor = d > 3.5 ? '#ef4444' : (d > 3.2 ? '#eab308' : '#22c55e');
-          appState.compA.addRepresentation('distance', {
+          let lineColor = d > 3.2 ? '#eab308' : '#22c55e';
+          appState.distRepA = appState.compA.addRepresentation('distance', {
             atomPair: appState.dynamicPairsA, color: lineColor, radius: 0.08, dashLength: 0.2, labelUnit: 'angstrom', labelSize: 1.4, labelBackground: true, labelBackgroundColor: '#0b0f19'
           });
         }
 
         const labelMapA = {};
-        if (appState.dynamicPairsA.length > 0) {
-          labelMapA[appState.dynamicPairsA[0][0]] = `K${STANDARD_TARGET_K}`;
-          labelMapA[appState.dynamicPairsA[0][1]] = `DG${STANDARD_TARGET_DG}`;
-        }
+        labelMapA[appState.actualKResnoInPdbA] = `K${STANDARD_TARGET_K}`;
+        labelMapA[appState.actualDGResnoInPdbA] = `DG${STANDARD_TARGET_DG}`;
+
         appState.compA.addRepresentation('label', {
           sele: `(${appState.actualKResnoInPdbA} and .NZ) or (${appState.actualDGResnoInPdbA} and .O6)`,
           labelType: 'text', labelText: labelMapA, color: '#facc15', size: 1.4, showBackground: true, backgroundColor: '#0b0f19', backgroundOpacity: 0.8
@@ -629,6 +811,9 @@
     function applyStageBRepresentations() {
       if (!appState.compB) return;
       appState.compB.removeAllRepresentations();
+      appState.distRepB = null;
+      appState.zincRepB = null;
+      appState.licoriceRepB = null;
 
       const bgOpacity = appState.isFocusMode ? 0.22 : 1.0;
 
@@ -644,31 +829,27 @@
       });
 
       updateDnaRungsB();
-
-      appState.compB.addRepresentation('spacefill', { sele: '_ZN or :ZN or [ZN] or zinc', color: '#94a3b8', scale: 0.35, opacity: bgOpacity });
+      updateZincB();
 
       if (appState.isFocusMode && appState.actualKResnoInPdbB) {
-        const pairSeleB = `(${appState.actualKResnoInPdbB} and protein) or (${appState.actualDGResnoInPdbB} and not protein)`;
-        appState.compB.addRepresentation('licorice', {
-          sele: `${pairSeleB} and not hydrogen`, colorScheme: 'element', radius: 0.24, opacity: 1.0
-        });
+        updateFocusPairB();
 
         if (appState.dynamicPairsB.length > 0) {
           const dB = appState.currentDistanceB;
-          let lineColorB = dB > 3.5 ? '#ef4444' : (dB > 3.2 ? '#eab308' : '#22c55e');
-          appState.compB.addRepresentation('distance', {
+          let lineColorB = dB > 3.2 ? '#eab308' : '#22c55e';
+          appState.distRepB = appState.compB.addRepresentation('distance', {
             atomPair: appState.dynamicPairsB, color: lineColorB, radius: 0.08, dashLength: 0.2, labelUnit: 'angstrom', labelSize: 1.4, labelBackground: true, labelBackgroundColor: '#0b0f19'
           });
-
-          const labelMapB = {};
-          labelMapB[appState.dynamicPairsB[0][0]] = `K${STANDARD_TARGET_K}`;
-          labelMapB[appState.dynamicPairsB[0][1]] = `DG${STANDARD_TARGET_DG}`;
-
-          appState.compB.addRepresentation('label', {
-            sele: `(${appState.actualKResnoInPdbB} and .NZ) or (${appState.actualDGResnoInPdbB} and .O6)`,
-            labelType: 'text', labelText: labelMapB, color: '#facc15', size: 1.4, showBackground: true, backgroundColor: '#0b0f19', backgroundOpacity: 0.8
-          });
         }
+
+        const labelMapB = {};
+        labelMapB[appState.actualKResnoInPdbB] = `K${STANDARD_TARGET_K}`;
+        labelMapB[appState.actualDGResnoInPdbB] = `DG${STANDARD_TARGET_DG}`;
+
+        appState.compB.addRepresentation('label', {
+          sele: `(${appState.actualKResnoInPdbB} and .NZ) or (${appState.actualDGResnoInPdbB} and .O6)`,
+          labelType: 'text', labelText: labelMapB, color: '#facc15', size: 1.4, showBackground: true, backgroundColor: '#0b0f19', backgroundOpacity: 0.8
+        });
       }
     }
 
@@ -871,8 +1052,15 @@
       const stB = appState.compB ? appState.compB.structure : null;
       updateDynamicInteractionsAndHUD(stA, stB);
 
+      // 動態更新梯級與行動端鋅離子 / 特寫殘基
       updateDnaRungsA();
       updateDnaRungsB();
+      updateZincA();
+      updateZincB();
+      if (appState.isFocusMode) {
+        updateFocusPairA();
+        updateFocusPairB();
+      }
 
       dom.slider.value = f;
       dom.sliderCurr.textContent = f;
@@ -934,7 +1122,6 @@
       }
     }
 
-    // 【核心修復】：兩側播放器同步驅動，解決右側不動的問題
     function startPlayback() {
       if (appState.totalFramesA <= 1) return;
       pausePlayback();
@@ -1033,6 +1220,8 @@
           const stB = appState.compB ? appState.compB.structure : null;
           updateDynamicInteractionsAndHUD(comp.structure, stB);
           updateDnaRungsA();
+          updateZincA();
+          if (appState.isFocusMode) updateFocusPairA();
         });
 
         const handleCount = (count) => {
@@ -1094,9 +1283,10 @@
           appState.trajCompB = trajCompB;
           appState.trajectoryB = trajCompB.trajectory;
 
-          // 軌跡 B 換幀訊號：動態重算梯級與 HUD
           trajCompB.trajectory.signals.frameChanged.add(function () {
             updateDnaRungsB();
+            updateZincB();
+            if (appState.isFocusMode) updateFocusPairB();
             const stA = appState.compA ? appState.compA.structure : null;
             updateDynamicInteractionsAndHUD(stA, comp.structure);
           });
@@ -1106,7 +1296,6 @@
             const typeStr = (count > 1) ? `[軌跡: ${count} 幀]` : `[單結構]`;
             dom.badgeTitleB.textContent = `視窗 B: ${url.replace(/\.pdb(\.gz)?$/i, '')} ${typeStr}`;
             configureAndSyncPlayers();
-            // 【核心修正】：若視窗 A 已在播放中，B 載入完畢後立即跟隨啟動播放！
             if (appState.isPlaying && count > 1) {
               trajCompB.trajectory.player.play();
             }
@@ -1119,7 +1308,6 @@
         }
 
         comp.autoView(500);
-
         alignStructureBToA();
 
       } catch (err) {
@@ -1335,6 +1523,7 @@
       registerCustomColorSchemes();
       installArrowPatch();
 
+      // 【核心配置】：在 Stage 層級加入 impostor: false，強制行動端全面使用 3D 幾何網格
       const stageConfig = {
         backgroundColor: '#0b0f19',
         cameraType: 'perspective',
@@ -1343,7 +1532,8 @@
         lightColor: 0xffffff,
         lightIntensity: 0.95,
         clipNear: 0, clipFar: 100, fogNear: 100, fogFar: 100,
-        sampleLevel: 0
+        sampleLevel: 0,
+        impostor: false
       };
 
       appState.stageA = new NGL.Stage('viewport-a', stageConfig);
