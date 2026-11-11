@@ -43,10 +43,10 @@
 </head>
 <body class="w-screen h-screen relative bg-[#0b0f19] flex flex-col">
 
-  <!-- 3D 渲染視窗容器 (左右分割排版) -->
+  <!-- 3D 渲染視窗容器 (左右分割排版，移除 CSS transition 確保 resize 即時居中) -->
   <div id="viewport-container" class="w-full h-full relative flex flex-row overflow-hidden">
     <!-- 左側視窗 (結構 A) -->
-    <div id="viewport-a" class="w-full h-full relative cursor-grab active:cursor-grabbing transition-all duration-300">
+    <div id="viewport-a" class="w-full h-full relative cursor-grab active:cursor-grabbing">
       <div class="absolute top-14 left-3 z-10 pointer-events-none flex items-center space-x-1.5 bg-slate-900/80 backdrop-blur-md px-2.5 py-1 rounded-lg border border-cyan-500/40 text-[11px] font-mono font-bold text-cyan-300">
         <span class="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></span>
         <span id="badge-title-a">視窗 A (主結構)</span>
@@ -54,9 +54,9 @@
     </div>
 
     <!-- 右側視窗 (結構 B - 左右對比時展開) -->
-    <div id="viewport-b" class="hidden w-1/2 h-full relative cursor-grab active:cursor-grabbing border-l border-slate-700/80 transition-all duration-300">
-      <div class="absolute top-14 left-3 z-10 pointer-events-none flex items-center space-x-1.5 bg-slate-900/80 backdrop-blur-md px-2.5 py-1 rounded-lg border border-amber-500/40 text-[11px] font-mono font-bold text-amber-300">
-        <span class="w-2 h-2 rounded-full bg-amber-400"></span>
+    <div id="viewport-b" class="hidden w-1/2 h-full relative cursor-grab active:cursor-grabbing border-l border-slate-700/80">
+      <div class="absolute top-14 left-3 z-10 pointer-events-none flex items-center space-x-1.5 bg-slate-900/80 backdrop-blur-md px-2.5 py-1 rounded-lg border border-cyan-500/40 text-[11px] font-mono font-bold text-cyan-300">
+        <span class="w-2 h-2 rounded-full bg-cyan-400"></span>
         <span id="badge-title-b">視窗 B (對比結構)</span>
       </div>
     </div>
@@ -73,27 +73,34 @@
     </div>
 
     <!-- 中間：右側檔案 B 選單 (開啟左右對比時呈現) -->
-    <div id="file-box-b" class="hidden bg-slate-900/90 backdrop-blur-md border border-amber-500/40 rounded-xl px-2.5 py-1.5 flex items-center space-x-2 pointer-events-auto shadow-lg max-w-xs sm:max-w-sm w-full">
-      <span class="w-2.5 h-2.5 rounded-full bg-amber-400 shrink-0" title="結構 B"></span>
-      <select id="file-selector-b" class="bg-slate-800 border border-slate-700 text-amber-200 text-xs rounded-lg px-2 py-1 w-full truncate focus:outline-none cursor-pointer">
+    <div id="file-box-b" class="hidden bg-slate-900/90 backdrop-blur-md border border-cyan-500/40 rounded-xl px-2.5 py-1.5 flex items-center space-x-2 pointer-events-auto shadow-lg max-w-xs sm:max-w-sm w-full">
+      <span class="w-2.5 h-2.5 rounded-full bg-cyan-400 shrink-0" title="結構 B"></span>
+      <select id="file-selector-b" class="bg-slate-800 border border-slate-700 text-cyan-200 text-xs rounded-lg px-2 py-1 w-full truncate focus:outline-none cursor-pointer">
         <option value="" disabled selected>選擇對比檔案 B...</option>
       </select>
     </div>
 
     <!-- 右側功能按鍵群 -->
     <div class="flex items-center space-x-2 pointer-events-auto shrink-0">
-      <!-- 左右分割對比開關 (Side-by-Side Split) -->
+      <!-- 左右分割對比開關 -->
       <button id="btn-toggle-split" class="bg-slate-900/90 backdrop-blur-md border border-purple-500/50 hover:bg-slate-800 text-purple-300 px-2.5 py-1.5 rounded-xl text-xs font-semibold flex items-center space-x-1.5 transition shadow-lg" title="左右各放一個 PDB 同步對比">
         <i data-lucide="columns-2" class="w-3.5 h-3.5 text-purple-400"></i>
         <span>左右對比:</span>
         <span id="split-status" class="font-bold text-slate-400">OFF</span>
       </button>
 
-      <!-- 視角同步旋轉開關 (Sync Camera) -->
-      <button id="btn-toggle-sync" class="hidden bg-slate-900/90 backdrop-blur-md border border-blue-500/50 hover:bg-slate-800 text-blue-300 px-2 py-1.5 rounded-xl text-xs font-medium flex items-center space-x-1 transition shadow-lg" title="左右兩視窗同步旋轉與縮放">
+      <!-- 視角同步旋轉與對齊按鍵 (Sync Camera) -->
+      <button id="btn-toggle-sync" class="hidden bg-slate-900/90 backdrop-blur-md border border-blue-500/50 hover:bg-slate-800 text-blue-300 px-2 py-1.5 rounded-xl text-xs font-medium flex items-center space-x-1 transition shadow-lg" title="同步視角並自動將 B 結構對齊 A 結構">
         <i data-lucide="link" class="w-3.5 h-3.5 text-blue-400"></i>
-        <span class="hidden sm:inline">視角同步:</span>
+        <span class="hidden sm:inline">同步對齊:</span>
         <span id="sync-status" class="font-bold text-emerald-400">ON</span>
+      </button>
+
+      <!-- 平滑內插補幀開關 (保留平滑選擇) -->
+      <button id="btn-toggle-interpolate" class="bg-slate-900/90 backdrop-blur-md border border-cyan-500/50 hover:bg-slate-800 text-cyan-300 px-2.5 py-1.5 rounded-xl text-xs font-medium flex items-center space-x-1.5 transition shadow-lg" title="開啟 Spline 內插補幀，讓 60 幀動作極致平滑">
+        <i data-lucide="activity" class="w-3.5 h-3.5 text-cyan-400"></i>
+        <span class="hidden sm:inline">平滑:</span>
+        <span id="interpolate-status" class="font-bold text-emerald-400">ON</span>
       </button>
 
       <!-- 特寫按鈕 -->
@@ -102,14 +109,14 @@
         <span id="focus-btn-text">特寫 K114 - DG82</span>
       </button>
 
-      <!-- 重設視角按鈕 -->
+      <!-- 重設視角按鈕 (R) -->
       <button id="btn-reset-view" title="重設整體視角 (R)" class="bg-slate-900/90 backdrop-blur-md border border-slate-700/80 hover:bg-slate-800 text-slate-300 hover:text-white p-2 rounded-xl text-xs transition shadow-lg shrink-0">
         <i data-lucide="maximize" class="w-4 h-4"></i>
       </button>
     </div>
   </header>
 
-  <!-- 左上方 HUD：即時距離監控面板 (左側主結構測距) -->
+  <!-- 左上方 HUD：即時距離監控面板 (左側結構 A 測距) -->
   <div id="hud-panel" class="absolute top-24 left-3 z-20 bg-slate-900/90 backdrop-blur-md border border-slate-700/80 rounded-2xl p-3 pointer-events-none shadow-xl flex flex-col space-y-2 min-w-[210px] transition-all duration-300">
     <div class="flex items-center justify-between border-b border-slate-800 pb-1.5">
       <span class="text-[11px] font-bold text-slate-300 flex items-center gap-1.5">
@@ -155,7 +162,7 @@
     </div>
   </div>
 
-  <!-- 底部軌跡播放控制器 (同步控制左/右兩邊) -->
+  <!-- 底部軌跡播放控制器 (同步控制 A 與 B) -->
   <footer id="bottom-timeline" class="hidden absolute custom-bottom-timeline left-3 right-3 sm:left-12 sm:right-12 z-20 pointer-events-none flex flex-col items-center">
     <div class="bg-slate-900/95 backdrop-blur-md border border-slate-700/80 w-full max-w-lg rounded-2xl px-4 py-2.5 shadow-2xl pointer-events-auto flex flex-col gap-2">
       <!-- 幀數拉桿 -->
@@ -174,7 +181,7 @@
           <span id="loop-label">循環</span>
         </button>
 
-        <!-- 播放主按鍵 -->
+        <!-- 播放主按鍵 (暫停絕對正常) -->
         <div class="flex items-center space-x-1">
           <button id="btn-first-frame" class="p-1.5 rounded-lg hover:bg-slate-800 text-slate-300 hover:text-white transition">
             <i data-lucide="skip-back" class="w-4 h-4"></i>
@@ -230,27 +237,29 @@
       totalFramesA: 1,
       currentFrameA: 0,
 
-      // 結構 B
+      // 結構 B (不變顏色，維持同款原版真實配色)
       compB: null,
       trajCompB: null,
       trajectoryB: null,
       totalFramesB: 1,
 
-      // 左右分割與視角同步
+      // 左右分割與雙向視角同步
       isSplitMode: false,
       syncCamera: true,
       isSyncingCam: false,
 
-      // 播放控制器
+      // 播放控制器 (純自研獨立計時，暫停100%精準停格)
       isPlaying: false,
       fps: 10,
       loopMode: 'loop',
       direction: 1,
       timerId: null,
 
-      autoSlowdown: true,
-      isFocusMode: true,
+      // 內插設定 (保留平滑選擇)
+      interpolateOn: true,
+      interpolateStep: 6,
 
+      isFocusMode: true,
       actualKResnoInPdbA: null,
       actualDGResnoInPdbA: null,
       dynamicPairsA: [],
@@ -283,6 +292,8 @@
       splitStatus: document.getElementById('split-status'),
       btnToggleSync: document.getElementById('btn-toggle-sync'),
       syncStatus: document.getElementById('sync-status'),
+      btnToggleInterpolate: document.getElementById('btn-toggle-interpolate'),
+      interpolateStatus: document.getElementById('interpolate-status'),
 
       baseLegend: document.getElementById('base-legend'),
       loadingOverlay: document.getElementById('loading-overlay'),
@@ -540,8 +551,7 @@
         let curGroup = [nucleicResList[0]];
 
         for (let i = 0; i < nucleicResList.length - 1; i++) {
-          const r1 = nucleicResList[i];
-          const r2 = nucleicResList[i + 1];
+          const r1 = nucleicResList[i], r2 = nucleicResList[i + 1];
           let dist = 999;
           if (r1.o3 && r2.p) dist = Math.hypot(r1.o3.x - r2.p.x, r1.o3.y - r2.p.y, r1.o3.z - r2.p.z);
           if (dist > 4.5 || r1.resname.endsWith('3') || r2.resname.endsWith('5')) {
@@ -605,6 +615,7 @@
       }
     }
 
+    // 即時測距與 HUD 更新
     function updateDynamicInteractionsAndHUD(structure) {
       appState.dynamicPairsA = [];
       const kAtoms = [];
@@ -666,6 +677,7 @@
       }
     }
 
+    // 繪製結構 A 表示法 (完全比照原版 PyMOL 配色)
     function applyStageARepresentations() {
       if (!appState.compA) return;
       appState.compA.removeAllRepresentations();
@@ -796,6 +808,7 @@
       }
     }
 
+    // 繪製結構 B 表示法 (【核心修改點 1】：完全不變顏色！與 A 保持一模一樣的經典真實配色)
     function applyStageBRepresentations() {
       if (!appState.compB) return;
       appState.compB.removeAllRepresentations();
@@ -805,9 +818,10 @@
         appState.ladderShapeCompB = null;
       }
 
+      // 與結構 A 完全一致的 PyMOL SS 配色 (Helix 紅 / Sheet 黃 / Loop 綠)
       appState.compB.addRepresentation('cartoon', {
-        sele: 'protein and not hydrogen',
-        color: '#f59e0b',
+        sele: 'protein and not hydrogen and not (_ZN or :ZN or [ZN] or zinc)',
+        colorScheme: appState.ssSchemeIds.pymol_ss,
         aspectRatio: 5,
         subdiv: 12,
         radialSegments: 20,
@@ -818,25 +832,30 @@
       if (appState.dnaStrandSelectionsB && appState.dnaStrandSelectionsB.length > 0) {
         appState.dnaStrandSelectionsB.forEach(strandSele => {
           appState.compB.addRepresentation('cartoon', {
-            sele: `${strandSele} and not protein and not hydrogen`,
-            color: '#fbbf24',
+            sele: `${strandSele} and not protein and not (_ZN or :ZN or [ZN] or zinc)`,
+            color: '#7dd3fc',
+            radiusType: 'size',
             radiusSize: 0.55,
             aspectRatio: 4,
+            tension: 0.3,
             smoothSheet: false,
             subdiv: 12
           });
         });
       } else {
         appState.compB.addRepresentation('cartoon', {
-          sele: 'nucleic and not protein and not hydrogen',
-          color: '#fbbf24',
+          sele: 'nucleic and not protein and not hydrogen and not (_ZN or :ZN or [ZN] or zinc)',
+          color: '#7dd3fc',
+          radiusType: 'size',
           radiusSize: 0.55,
           aspectRatio: 4,
+          tension: 0.3,
           smoothSheet: false,
           subdiv: 12
         });
       }
 
+      // 結構 B 同樣繪製彩色 DNA 梯級
       if (appState.dnaRungStubsB && appState.dnaRungStubsB.length > 0) {
         const shape = new NGL.Shape("vmd_rungs_b");
         const structure = appState.compB.structure;
@@ -864,11 +883,35 @@
 
       appState.compB.addRepresentation('spacefill', {
         sele: '_ZN or :ZN or [ZN] or zinc',
-        color: '#fbbf24',
+        color: '#94a3b8',
         scale: 0.35
       });
     }
 
+    // 【核心修改點 2 & 4】：結構與視角對齊核心函式
+    function alignStructureBToA() {
+      if (!appState.compA || !appState.compB) return;
+      try {
+        // 1. 座標三維對齊 (Superposition: 將 B 的座標系直接旋轉平移對齊 A)
+        NGL.superpose(appState.compA.structure, appState.compB.structure, true, 'backbone and not hydrogen');
+        appState.compB.updateRepresentations({ position: true });
+      } catch (e) {
+        try {
+          NGL.superpose(appState.compA.structure, appState.compB.structure, true, 'protein and .CA');
+          appState.compB.updateRepresentations({ position: true });
+        } catch (err) {
+          console.warn('Superpose 輕微警告:', err);
+        }
+      }
+
+      // 2. 視角相機矩陣 100% 複製 (Orient Matrix)
+      if (appState.stageA && appState.stageB) {
+        const orient = appState.stageA.viewerControls.getOrientation();
+        appState.stageB.viewerControls.orient(orient);
+      }
+    }
+
+    // 換幀函式
     function setFrame(targetFrame) {
       const maxF = appState.totalFramesA - 1;
       let f = Math.max(0, Math.min(targetFrame, maxF));
@@ -1003,6 +1046,14 @@
         appState.trajCompA = trajComp;
         appState.trajectoryA = trajectory;
 
+        // 若開啟平滑內插，為軌跡設定參數
+        if (trajectory.player) {
+          trajectory.player.setParameters({
+            interpolateType: appState.interpolateOn ? "spline" : "none",
+            interpolateStep: appState.interpolateStep
+          });
+        }
+
         const handleCount = (count) => {
           if (count > 1) {
             appState.totalFramesA = count;
@@ -1059,14 +1110,19 @@
           const trajCompB = comp.addTrajectory();
           appState.trajCompB = trajCompB;
           appState.trajectoryB = trajCompB.trajectory;
+          if (trajCompB.trajectory && trajCompB.trajectory.player) {
+            trajCompB.trajectory.player.setParameters({
+              interpolateType: appState.interpolateOn ? "spline" : "none",
+              interpolateStep: appState.interpolateStep
+            });
+          }
         } catch (e) {}
 
         comp.autoView(500);
 
-        if (appState.syncCamera && appState.stageA) {
-          const orient = appState.stageA.viewerControls.getOrientation();
-          appState.stageB.viewerControls.orient(orient);
-        }
+        // 【核心】：自動對齊 B 到 A
+        alignStructureBToA();
+
       } catch (err) {
         console.error('結構 B 載入失敗:', err);
         alert('對比檔案 B 載入失敗。');
@@ -1075,6 +1131,7 @@
       }
     }
 
+    // 左右對比開關切換
     function enableSplitMode() {
       appState.isSplitMode = true;
       dom.splitStatus.textContent = 'ON';
@@ -1088,15 +1145,18 @@
       dom.viewportB.classList.remove('hidden');
       dom.viewportB.classList.add('w-1/2');
 
-      setTimeout(() => {
-        appState.stageA.handleResize();
-        appState.stageB.handleResize();
-        if (dom.fileSelectorB.value) {
-          loadPdbFileB(dom.fileSelectorB.value);
-        }
-      }, 50);
+      // 調整雙視窗尺寸
+      appState.stageA.handleResize();
+      appState.stageB.handleResize();
+
+      if (dom.fileSelectorB.value) {
+        loadPdbFileB(dom.fileSelectorB.value);
+      } else {
+        alignStructureBToA();
+      }
     }
 
+    // 【核心修改點 3】：取消左右雙分割時，立刻精準回歸畫面幾何正中間！
     function disableSplitMode() {
       appState.isSplitMode = false;
       dom.splitStatus.textContent = 'OFF';
@@ -1110,12 +1170,24 @@
       dom.viewportA.classList.remove('w-1/2');
       dom.viewportA.classList.add('w-full');
 
-      setTimeout(() => {
+      // 即時重新計算 WebGL 視口大小，並將相機強制重置回視野正中央
+      appState.stageA.handleResize();
+      if (appState.compA) {
+        if (appState.isFocusMode) {
+          const focusSele = `(${appState.actualKResnoInPdbA} and protein) or (${appState.actualDGResnoInPdbA} and not protein)`;
+          appState.compA.autoView(focusSele, 0);
+        } else {
+          appState.compA.autoView(0);
+        }
+      }
+
+      // 額外於下一幀再校正一次，保證 100% 不偏離中心
+      requestAnimationFrame(() => {
         appState.stageA.handleResize();
-        if (appState.compA) appState.compA.autoView(500);
-      }, 50);
+      });
     }
 
+    // 視角雙向同步事件綁定
     function initCameraSync() {
       appState.stageA.viewerControls.signals.changed.add(() => {
         if (!appState.isSplitMode || !appState.syncCamera || appState.isSyncingCam || !appState.stageB) return;
@@ -1206,10 +1278,32 @@
         else enableSplitMode();
       });
 
+      // 【核心修改點 4】：點擊「同步對齊」切換時，如果切為 ON，額外執行一次嚴格對齊
       dom.btnToggleSync.addEventListener('click', () => {
         appState.syncCamera = !appState.syncCamera;
         dom.syncStatus.textContent = appState.syncCamera ? 'ON' : 'OFF';
         dom.syncStatus.className = appState.syncCamera ? 'font-bold text-emerald-400' : 'font-bold text-slate-500';
+
+        if (appState.syncCamera) {
+          alignStructureBToA();
+        }
+      });
+
+      // 【核心修改點 5】：平滑內插開關事件監聽
+      dom.btnToggleInterpolate.addEventListener('click', () => {
+        appState.interpolateOn = !appState.interpolateOn;
+        dom.interpolateStatus.textContent = appState.interpolateOn ? 'ON' : 'OFF';
+        dom.interpolateStatus.className = appState.interpolateOn ? 'font-bold text-emerald-400' : 'font-bold text-slate-500';
+
+        const type = appState.interpolateOn ? "spline" : "none";
+        const step = appState.interpolateOn ? appState.interpolateStep : 1;
+
+        if (appState.trajectoryA && appState.trajectoryA.player) {
+          appState.trajectoryA.player.setParameters({ interpolateType: type, interpolateStep: step });
+        }
+        if (appState.trajectoryB && appState.trajectoryB.player) {
+          appState.trajectoryB.player.setParameters({ interpolateType: type, interpolateStep: step });
+        }
       });
 
       dom.btnSpeed.addEventListener('click', () => {
