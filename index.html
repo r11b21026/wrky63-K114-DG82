@@ -94,14 +94,14 @@
         <span id="split-status" class="font-bold text-slate-400">OFF</span>
       </button>
 
-      <!-- DNA 鹼基對齊按鈕 (解決 DNA 頭尾顛倒) -->
-      <button id="btn-align-dna" class="hidden bg-slate-900/90 backdrop-blur-md border border-indigo-500/50 hover:bg-slate-800 text-indigo-300 px-2.5 py-1.5 rounded-xl text-xs font-semibold flex items-center space-x-1 transition shadow-lg" title="以 DG82 與 DNA 鹼基環非對稱原子為錨點對齊，消弭頭尾顛倒">
+      <!-- DNA 鹼基對齊按鈕 (依據 DG82 與鹼基環非對稱原子對齊) -->
+      <button id="btn-align-dna" class="hidden bg-slate-900/90 backdrop-blur-md border border-indigo-500/50 hover:bg-slate-800 text-indigo-300 px-2.5 py-1.5 rounded-xl text-xs font-semibold flex items-center space-x-1 transition shadow-lg" title="以 DG82 與 DNA 鹼基環非對稱原子為錨點對齊，保證頭尾同向">
         <i data-lucide="crosshair" class="w-3.5 h-3.5 text-indigo-400"></i>
         <span>DNA鹼基對齊</span>
       </button>
 
       <!-- DNA 180° 翻轉開關 (若頭尾剛好相反可一鍵翻正) -->
-      <button id="btn-flip-dna" class="hidden bg-slate-900/90 backdrop-blur-md border border-amber-500/50 hover:bg-slate-800 text-amber-300 px-2.5 py-1.5 rounded-xl text-xs font-semibold flex items-center space-x-1 transition shadow-lg" title="若 DNA 頭尾剛好顛倒，點擊將結構 B 沿 DNA 對稱軸旋轉 180 度翻正">
+      <button id="btn-flip-dna" class="hidden bg-slate-900/90 backdrop-blur-md border border-amber-500/50 hover:bg-slate-800 text-amber-300 px-2.5 py-1.5 rounded-xl text-xs font-semibold flex items-center space-x-1 transition shadow-lg" title="若 DNA 頭尾剛好相反，點擊將結構 B 旋轉 180 度翻正">
         <i data-lucide="rotate-cw" class="w-3.5 h-3.5 text-amber-400"></i>
         <span>翻轉 180°</span>
       </button>
@@ -161,7 +161,7 @@
     </div>
   </div>
 
-  <!-- 鹼基圖例 (右上極簡懸浮) -->
+  <!-- 鹼基圖例 -->
   <div id="base-legend" class="absolute top-16 right-3 z-20 bg-slate-900/85 backdrop-blur-md border border-slate-700/70 rounded-xl px-2.5 py-1.5 pointer-events-none shadow-lg text-[10px] font-mono flex items-center gap-2">
     <span class="text-slate-400 font-bold border-r border-slate-700 pr-1.5">DNA</span>
     <div class="flex items-center space-x-1"><span class="w-2 h-2 rounded-full" style="background:#3859F2"></span><span class="text-slate-300">A</span></div>
@@ -178,7 +178,7 @@
     </div>
   </div>
 
-  <!-- 底部軌跡播放控制器 (同步控制 A 與 B) -->
+  <!-- 底部軌跡播放控制器 -->
   <footer id="bottom-timeline" class="hidden absolute custom-bottom-timeline left-3 right-3 sm:left-12 sm:right-12 z-20 pointer-events-none flex flex-col items-center">
     <div class="bg-slate-900/95 backdrop-blur-md border border-slate-700/80 w-full max-w-lg rounded-2xl px-4 py-2.5 shadow-2xl pointer-events-auto flex flex-col gap-2">
       <div class="flex items-center space-x-2.5 w-full font-mono text-xs">
@@ -252,8 +252,8 @@
       interpolateStep: 6,
       isFocusMode: true,
 
-      actualKResnoInPdbA: null, actualDGResnoInPdbA: null, dynamicPairsA: [], currentDistance: 2.8, focusLabelsCompA: null,
-      actualKResnoInPdbB: null, actualDGResnoInPdbB: null, dynamicPairsB: [], currentDistanceB: 2.8, focusLabelsCompB: null,
+      actualKResnoInPdbA: null, actualDGResnoInPdbA: null, dynamicPairsA: [], currentDistance: 2.8,
+      actualKResnoInPdbB: null, actualDGResnoInPdbB: null, dynamicPairsB: [], currentDistanceB: 2.8,
 
       dnaStrandSelectionsA: [], dnaRungStubsA: [], ladderShapeCompA: null,
       dnaStrandSelectionsB: [], dnaRungStubsB: [], ladderShapeCompB: null,
@@ -576,14 +576,10 @@
       }
     }
 
+    // 【關鍵修復】：表示法建立函式，只在載入或特寫模式切換時呼叫，絕不在換幀時頻繁刪除！
     function applyStageARepresentations() {
       if (!appState.compA) return;
       appState.compA.removeAllRepresentations();
-
-      if (appState.ladderShapeCompA) {
-        appState.stageA.removeComponent(appState.ladderShapeCompA);
-        appState.ladderShapeCompA = null;
-      }
 
       const bgOpacity = appState.isFocusMode ? 0.22 : 1.0;
 
@@ -593,39 +589,18 @@
         aspectRatio: 5, subdiv: 12, opacity: bgOpacity
       });
 
-      if (appState.dnaStrandSelectionsA && appState.dnaStrandSelectionsA.length > 0) {
-        appState.dnaStrandSelectionsA.forEach(strandSele => {
-          appState.compA.addRepresentation('cartoon', {
-            sele: `${strandSele} and not protein and not (_ZN or :ZN or [ZN] or zinc)`,
-            color: '#7dd3fc', radiusType: 'size', radiusSize: 0.55, opacity: bgOpacity
-          });
-        });
-      }
+      // DNA 骨架
+      appState.compA.addRepresentation('cartoon', {
+        sele: 'nucleic and not protein and not (_ZN or :ZN or [ZN] or zinc)',
+        color: '#7dd3fc', radiusType: 'size', radiusSize: 0.55, opacity: bgOpacity
+      });
 
-      if (appState.dnaRungStubsA && appState.dnaRungStubsA.length > 0) {
-        const shape = new NGL.Shape("vmd_rungs_a");
-        const structure = appState.compA.structure;
-        const baseColorPalette = { 'A': [0.22, 0.35, 0.95], 'T': [0.92, 0.28, 0.35], 'C': [0.95, 0.58, 0.20], 'G': [0.15, 0.80, 0.25], 'U': [0.92, 0.28, 0.35] };
-        const parseBaseColor = (rname) => baseColorPalette[(rname || '').trim().toUpperCase().replace(/^D/, '').replace(/[35]$/, '')] || [0.8, 0.84, 0.89];
-
-        appState.dnaRungStubsA.forEach(stub => {
-          const aBackbone = structure.getAtomProxy(stub.anchor);
-          const aBase = structure.getAtomProxy(stub.target);
-          if (aBackbone && aBase) {
-            const color = parseBaseColor(stub.resname);
-            const dx = aBase.x - aBackbone.x, dy = aBase.y - aBackbone.y, dz = aBase.z - aBackbone.z;
-            const dist = Math.hypot(dx, dy, dz);
-            if (dist > 0.8) {
-              const ux = dx / dist, uy = dy / dist, uz = dz / dist;
-              shape.addCylinder([aBackbone.x + ux * 1.2, aBackbone.y + uy * 1.2, aBackbone.z + uz * 1.2], [aBase.x, aBase.y, aBase.z], color, 0.44);
-              shape.addSphere([aBase.x, aBase.y, aBase.z], color, 0.44);
-            }
-          }
-        });
-
-        appState.ladderShapeCompA = appState.stageA.addComponentFromObject(shape);
-        appState.ladderShapeCompA.addRepresentation("buffer", { opacity: bgOpacity });
-      }
+      // DNA 階梯柱狀 (原生 base 表示法，100% 隨軌跡平滑內插運動，永不崩潰)
+      appState.compA.addRepresentation('base', {
+        sele: 'nucleic and not protein and not hydrogen',
+        colorScheme: 'resname',
+        opacity: bgOpacity
+      });
 
       appState.compA.addRepresentation('spacefill', { sele: '_ZN or :ZN or [ZN] or zinc', color: '#94a3b8', scale: 0.35, opacity: bgOpacity });
 
@@ -634,10 +609,8 @@
         appState.compA.addRepresentation('licorice', { sele: `${pairSele} and not hydrogen`, colorScheme: 'element', radius: 0.24, opacity: 1.0 });
 
         if (appState.dynamicPairsA.length > 0) {
-          const d = appState.currentDistance;
-          let lineColor = d > 3.5 ? '#ef4444' : (d > 3.2 ? '#eab308' : '#22c55e');
           appState.compA.addRepresentation('distance', {
-            atomPair: appState.dynamicPairsA, color: lineColor, radius: 0.08, labelUnit: 'angstrom', labelSize: 1.4, labelBackground: true, labelBackgroundColor: '#0b0f19'
+            atomPair: appState.dynamicPairsA, color: '#facc15', radius: 0.08, labelUnit: 'angstrom', labelSize: 1.4, labelBackground: true, labelBackgroundColor: '#0b0f19'
           });
         }
       }
@@ -647,11 +620,6 @@
       if (!appState.compB) return;
       appState.compB.removeAllRepresentations();
 
-      if (appState.ladderShapeCompB) {
-        appState.stageB.removeComponent(appState.ladderShapeCompB);
-        appState.ladderShapeCompB = null;
-      }
-
       const bgOpacity = appState.isFocusMode ? 0.22 : 1.0;
 
       appState.compB.addRepresentation('cartoon', {
@@ -660,38 +628,16 @@
         aspectRatio: 5, subdiv: 12, opacity: bgOpacity
       });
 
-      if (appState.dnaStrandSelectionsB && appState.dnaStrandSelectionsB.length > 0) {
-        appState.dnaStrandSelectionsB.forEach(strandSele => {
-          appState.compB.addRepresentation('cartoon', {
-            sele: `${strandSele} and not protein and not (_ZN or :ZN or [ZN] or zinc)`,
-            color: '#7dd3fc', radiusType: 'size', radiusSize: 0.55, opacity: bgOpacity
-          });
-        });
-      }
+      appState.compB.addRepresentation('cartoon', {
+        sele: 'nucleic and not protein and not (_ZN or :ZN or [ZN] or zinc)',
+        color: '#7dd3fc', radiusType: 'size', radiusSize: 0.55, opacity: bgOpacity
+      });
 
-      if (appState.dnaRungStubsB && appState.dnaRungStubsB.length > 0) {
-        const shape = new NGL.Shape("vmd_rungs_b");
-        const structure = appState.compB.structure;
-        const baseColorPalette = { 'A': [0.22, 0.35, 0.95], 'T': [0.92, 0.28, 0.35], 'C': [0.95, 0.58, 0.20], 'G': [0.15, 0.80, 0.25], 'U': [0.92, 0.28, 0.35] };
-        const parseBaseColor = (rname) => baseColorPalette[(rname || '').trim().toUpperCase().replace(/^D/, '').replace(/[35]$/, '')] || [0.8, 0.84, 0.89];
-
-        appState.dnaRungStubsB.forEach(stub => {
-          const aBackbone = structure.getAtomProxy(stub.anchor);
-          const aBase = structure.getAtomProxy(stub.target);
-          if (aBackbone && aBase) {
-            const color = parseBaseColor(stub.resname);
-            const dx = aBase.x - aBackbone.x, dy = aBase.y - aBackbone.y, dz = aBase.z - aBackbone.z;
-            const dist = Math.hypot(dx, dy, dz);
-            if (dist > 0.8) {
-              const ux = dx / dist, uy = dy / dist, uz = dz / dist;
-              shape.addCylinder([aBackbone.x + ux * 1.2, aBackbone.y + uy * 1.2, aBackbone.z + uz * 1.2], [aBase.x, aBase.y, aBase.z], color, 0.44);
-              shape.addSphere([aBase.x, aBase.y, aBase.z], color, 0.44);
-            }
-          }
-        });
-        appState.ladderShapeCompB = appState.stageB.addComponentFromObject(shape);
-        appState.ladderShapeCompB.addRepresentation("buffer", { opacity: bgOpacity });
-      }
+      appState.compB.addRepresentation('base', {
+        sele: 'nucleic and not protein and not hydrogen',
+        colorScheme: 'resname',
+        opacity: bgOpacity
+      });
 
       appState.compB.addRepresentation('spacefill', { sele: '_ZN or :ZN or [ZN] or zinc', color: '#94a3b8', scale: 0.35, opacity: bgOpacity });
 
@@ -700,10 +646,8 @@
         appState.compB.addRepresentation('licorice', { sele: `${pairSeleB} and not hydrogen`, colorScheme: 'element', radius: 0.24, opacity: 1.0 });
 
         if (appState.dynamicPairsB.length > 0) {
-          const dB = appState.currentDistanceB;
-          let lineColorB = dB > 3.5 ? '#ef4444' : (dB > 3.2 ? '#eab308' : '#22c55e');
           appState.compB.addRepresentation('distance', {
-            atomPair: appState.dynamicPairsB, color: lineColorB, radius: 0.08, labelUnit: 'angstrom', labelSize: 1.4, labelBackground: true, labelBackgroundColor: '#0b0f19'
+            atomPair: appState.dynamicPairsB, color: '#facc15', radius: 0.08, labelUnit: 'angstrom', labelSize: 1.4, labelBackground: true, labelBackgroundColor: '#0b0f19'
           });
         }
       }
@@ -716,15 +660,12 @@
       const sA = appState.compA.structure;
       const sB = appState.compB.structure;
 
-      // 1. 抓取結構 A 與 B 之中所有 DNA 原子的對應表 (以殘基相對位置 + 原字名絕對匹配)
       const dnaAtomsA = new Map();
       const dnaAtomsB = new Map();
 
-      // 提取 A 的 DNA 重原子 (以 DG82 為錨點計算相對偏差)
       sA.eachResidue(r => {
         if (!r.isNucleic()) return;
         const offset = r.resno - appState.actualDGResnoInPdbA;
-        // 限制在核心結合位點 ±5 個鹼基對內
         if (Math.abs(offset) > 5) return;
         r.eachAtom(a => {
           if (a.element === 'H') return;
@@ -733,7 +674,6 @@
         });
       });
 
-      // 提取 B 的 DNA 重原子
       sB.eachResidue(r => {
         if (!r.isNucleic()) return;
         const offset = r.resno - appState.actualDGResnoInPdbB;
@@ -745,7 +685,6 @@
         });
       });
 
-      // 2. 構建嚴格成對匹配點集
       const ptsA = [];
       const ptsB = [];
       dnaAtomsA.forEach((posA, key) => {
@@ -756,12 +695,10 @@
       });
 
       if (ptsA.length < 10) {
-        console.warn('匹配原子數不足，改以標準骨架對齊');
         cloneCameraFromAToB();
         return;
       }
 
-      // 3. 計算質心
       let cA = [0, 0, 0], cB = [0, 0, 0];
       const n = ptsA.length;
       for (let i = 0; i < n; i++) {
@@ -771,7 +708,6 @@
       cA = [cA[0] / n, cA[1] / n, cA[2] / n];
       cB = [cB[0] / n, cB[1] / n, cB[2] / n];
 
-      // 4. 計算協方差矩陣 H (3x3)
       let Sxx = 0, Sxy = 0, Sxz = 0;
       let Syx = 0, Syy = 0, Syz = 0;
       let Szx = 0, Szy = 0, Szz = 0;
@@ -785,7 +721,6 @@
         Szx += bz * ax; Szy += bz * ay; Szz += bz * az;
       }
 
-      // 5. 構造 Horn 4x4 矩陣
       const K = [
         [Sxx + Syy + Szz, Syz - Szy,       Szx - Sxz,       Sxy - Syx      ],
         [Syz - Szy,       Sxx - Syy - Szz, Sxy + Syx,       Szx + Sxz      ],
@@ -793,7 +728,6 @@
         [Sxy - Syx,       Szx + Sxz,       Syz + Szy,      -Sxx - Syy + Szz]
       ];
 
-      // 6. 冪次疊代求最大特徵值對應之旋轉四元數 q
       let q = [1, 0, 0, 0];
       for (let iter = 0; iter < 30; iter++) {
         let nq = [
@@ -806,18 +740,15 @@
         q = [nq[0]/len, nq[1]/len, nq[2]/len, nq[3]/len];
       }
 
-      // 7. 四元數轉 3x3 旋轉矩陣 R
       const [qw, qx, qy, qz] = q;
       const R00 = 1 - 2*qy*qy - 2*qz*qz, R01 = 2*qx*qy - 2*qz*qw,     R02 = 2*qx*qz + 2*qy*qw;
       const R10 = 2*qx*qy + 2*qz*qw,     R11 = 1 - 2*qx*qx - 2*qz*qz, R12 = 2*qy*qz - 2*qx*qw;
       const R20 = 2*qx*qz - 2*qy*qw,     R21 = 2*qy*qz + 2*qx*qw,     R22 = 1 - 2*qx*qx - 2*qy*qy;
 
-      // 8. 計算平移量 t = cA - R * cB
       const tx = cA[0] - (R00*cB[0] + R01*cB[1] + R02*cB[2]);
       const ty = cA[1] - (R10*cB[0] + R11*cB[1] + R12*cB[2]);
       const tz = cA[2] - (R20*cB[0] + R21*cB[1] + R22*cB[2]);
 
-      // 9. 構造 4x4 仿射變換矩陣，直接套用於 Component B (永久性持久化，軌跡換幀不跑位)
       const m4 = new NGL.Matrix4();
       m4.set(
         R00, R01, R02, tx,
@@ -829,16 +760,13 @@
       appState.compB.setTransform(m4);
       appState.transformMatrixB.copy(m4);
 
-      // 同步視角
       cloneCameraFromAToB();
     }
 
-    // 【180° 一鍵翻轉 DNA 頭尾】：若模型剛好顛倒，沿著 DNA 垂直對稱軸旋轉 180 度翻正
     function flipDna180() {
       if (!appState.compB) return;
       const sB = appState.compB.structure;
       
-      // 計算 B 結構 DNA 質心
       let cX = 0, cY = 0, cZ = 0, count = 0;
       sB.eachResidue(r => {
         if (r.isNucleic()) {
@@ -847,18 +775,15 @@
       });
       if (count > 0) { cX /= count; cY /= count; cZ /= count; }
 
-      // 繞著橫軸旋轉 180 度矩陣
       const rot180 = new NGL.Matrix4();
       rot180.makeRotationX(Math.PI);
 
-      // 平移到原點 -> 旋轉 180 -> 平移回質心
       const mTrans = new NGL.Matrix4().makeTranslation(-cX, -cY, -cZ);
       const mInv = new NGL.Matrix4().makeTranslation(cX, cY, cZ);
 
       const mFlip = new NGL.Matrix4();
       mFlip.multiply(mInv).multiply(rot180).multiply(mTrans);
 
-      // 乘上現有變換
       appState.transformMatrixB.premultiply(mFlip);
       appState.compB.setTransform(appState.transformMatrixB);
 
@@ -866,19 +791,20 @@
     }
 
     function cloneCameraFromAToB() {
-      if (!appState.stageA || !appState.stageB) return;
+      if (!appState.stageA || !appState.stageB || !appState.isSplitMode) return;
       const orient = appState.stageA.viewerControls.getOrientation();
       appState.stageB.viewerControls.orient(orient);
       appState.stageB.viewer.requestRender();
     }
 
     function cloneCameraFromBToA() {
-      if (!appState.stageA || !appState.stageB) return;
+      if (!appState.stageA || !appState.stageB || !appState.isSplitMode) return;
       const orient = appState.stageB.viewerControls.getOrientation();
       appState.stageA.viewerControls.orient(orient);
       appState.stageA.viewer.requestRender();
     }
 
+    // 換幀函式：【關鍵修改】：只換幀數與更新測距，絕對不重建整組 representation
     function setFrame(targetFrame) {
       const maxF = appState.totalFramesA - 1;
       let f = Math.max(0, Math.min(targetFrame, maxF));
@@ -890,9 +816,6 @@
       const stA = appState.compA ? appState.compA.structure : null;
       const stB = appState.compB ? appState.compB.structure : null;
       updateDynamicInteractionsAndHUD(stA, stB);
-
-      if (appState.compA) applyStageARepresentations();
-      if (appState.compB) applyStageBRepresentations();
 
       dom.slider.value = f;
       dom.sliderCurr.textContent = f;
@@ -966,11 +889,12 @@
       const stB = appState.compB ? appState.compB.structure : null;
       updateDynamicInteractionsAndHUD(stA, stB);
 
+      applyStageARepresentations();
+      if (appState.compB) applyStageBRepresentations();
+
       if (appState.isFocusMode) {
         dom.btnFocusPair.classList.add('bg-amber-500/30', 'border-amber-400');
         dom.focusBtnText.textContent = '重設視角';
-        applyStageARepresentations();
-        if (appState.compB) applyStageBRepresentations();
         
         const focusSeleA = `(${appState.actualKResnoInPdbA} and protein) or (${appState.actualDGResnoInPdbA} and not protein)`;
         appState.stageA.autoView(focusSeleA, 500);
@@ -984,8 +908,6 @@
       } else {
         dom.btnFocusPair.classList.remove('bg-amber-500/30', 'border-amber-400');
         dom.focusBtnText.textContent = '特寫 K114 - DG82';
-        applyStageARepresentations();
-        if (appState.compB) applyStageBRepresentations();
         
         appState.stageA.autoView(500);
         const startTime = performance.now();
@@ -1004,10 +926,6 @@
 
       try {
         appState.stageA.removeAllComponents();
-        if (appState.ladderShapeCompA) {
-          appState.stageA.removeComponent(appState.ladderShapeCompA);
-          appState.ladderShapeCompA = null;
-        }
 
         const comp = await appState.stageA.loadFile(url, { defaultRepresentation: false, asTrajectory: true });
         appState.compA = comp;
@@ -1030,14 +948,13 @@
         appState.trajCompA = trajComp;
         appState.trajectoryA = trajComp.trajectory;
 
+        // 【關鍵修復】：換幀事件只更新數值，絕不呼叫 applyStageARepresentations()
         appState.trajectoryA.signals.frameChanged.add(function (frameIndex) {
           appState.currentFrameA = frameIndex;
           dom.slider.value = frameIndex;
           dom.sliderCurr.textContent = frameIndex;
           const stB = appState.compB ? appState.compB.structure : null;
           updateDynamicInteractionsAndHUD(comp.structure, stB);
-          applyStageARepresentations();
-          if (appState.compB && appState.trajectoryB) applyStageBRepresentations();
         });
 
         const handleCount = (count) => {
@@ -1072,10 +989,6 @@
 
       try {
         appState.stageB.removeAllComponents();
-        if (appState.ladderShapeCompB) {
-          appState.stageB.removeComponent(appState.ladderShapeCompB);
-          appState.ladderShapeCompB = null;
-        }
 
         const comp = await appState.stageB.loadFile(url, { defaultRepresentation: false, asTrajectory: true });
         appState.compB = comp;
@@ -1098,7 +1011,6 @@
           appState.trajectoryB = trajCompB.trajectory;
         } catch (e) {}
 
-        // 預設執行 DNA 鹼基對齊 (以 DG82 與 W-box 核心鹼基環鎖定頭尾方向)
         alignDnaBasesHorn();
       } catch (err) {
         console.error('結構 B 載入失敗:', err);
@@ -1187,34 +1099,52 @@
       const specifiedFile = urlParams.get('file') || urlParams.get('pdb');
       const specifiedFileB = urlParams.get('fileB') || urlParams.get('pdbB');
 
-      // 預設檔案
-      const fileList = [
-        'WT_stable_aligned.pdb',
-        'aa_breathing_snippet_aligned.pdb'
-      ];
+      let found = [];
+      const hostname = window.location.hostname;
+      const pathname = window.location.pathname.replace(/^\/|\/$/g, '');
+
+      if (hostname.endsWith('github.io') && pathname) {
+        const owner = hostname.split('.')[0];
+        const repo = pathname.split('/')[0];
+        try {
+          const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents`);
+          if (res.ok) {
+            const data = await res.json();
+            found = data
+              .filter(item => item.type === 'file' && (item.name.endsWith('.pdb') || item.name.endsWith('.pdb.gz')))
+              .map(item => item.name);
+          }
+        } catch (e) {}
+      }
 
       dom.fileSelectorA.innerHTML = '';
       dom.fileSelectorB.innerHTML = '<option value="" disabled selected>選擇對比檔案 B...</option>';
 
-      fileList.forEach(name => {
-        const optA = document.createElement('option');
-        optA.value = name; optA.textContent = name;
-        dom.fileSelectorA.appendChild(optA);
+      if (found.length > 0) {
+        found.forEach(name => {
+          const optA = document.createElement('option');
+          optA.value = name; optA.textContent = name;
+          dom.fileSelectorA.appendChild(optA);
 
-        const optB = document.createElement('option');
-        optB.value = name; optB.textContent = name;
-        dom.fileSelectorB.appendChild(optB);
-      });
+          const optB = document.createElement('option');
+          optB.value = name; optB.textContent = name;
+          dom.fileSelectorB.appendChild(optB);
+        });
 
-      const initialA = specifiedFile || fileList[0];
-      dom.fileSelectorA.value = initialA;
-      loadPdbFileA(initialA);
+        const initialA = specifiedFile || found[0];
+        dom.fileSelectorA.value = initialA;
+        loadPdbFileA(initialA);
 
-      const initialB = specifiedFileB || fileList[1];
-      dom.fileSelectorB.value = initialB;
-
-      if (specifiedFileB) {
-        enableSplitMode();
+        const initialB = specifiedFileB || (found.length > 1 ? found[1] : found[0]);
+        dom.fileSelectorB.value = initialB;
+        if (specifiedFileB) enableSplitMode();
+      } else {
+        if (specifiedFile) {
+          dom.fileSelectorA.innerHTML = `<option value="${specifiedFile}">${specifiedFile}</option>`;
+          loadPdbFileA(specifiedFile);
+        } else {
+          hideLoading();
+        }
       }
     }
 
@@ -1239,12 +1169,10 @@
         else enableSplitMode();
       });
 
-      // 點擊 DNA 鹼基對齊按鈕
       dom.btnAlignDna.addEventListener('click', () => {
         alignDnaBasesHorn();
       });
 
-      // 點擊 180 度翻轉按鈕
       dom.btnFlipDna.addEventListener('click', () => {
         flipDna180();
       });
