@@ -4,6 +4,10 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>WRKY63 左右雙分割對比分子播放器</title>
+  <!-- Tailwind CDN 警告靜音設定 -->
+  <script>
+    window.tailwind = { config: { corePlugins: { preflight: true } } };
+  </script>
   <!-- Tailwind CSS & Lucide Icons -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
@@ -52,14 +56,14 @@
       </div>
     </div>
 
-    <!-- 右側視窗 (結構 B - 左右對比時展開) -->
+    <!-- 右側視窗 (結構 B) -->
     <div id="viewport-b" class="hidden w-1/2 h-full relative cursor-grab active:cursor-grabbing border-l border-slate-700/80">
       <div class="absolute top-14 left-3 z-10 pointer-events-none flex items-center space-x-1.5 bg-slate-900/80 backdrop-blur-md px-2.5 py-1 rounded-lg border border-cyan-500/40 text-[11px] font-mono font-bold text-cyan-300">
         <span class="w-2 h-2 rounded-full bg-cyan-400"></span>
         <span id="badge-title-b">視窗 B (對比結構)</span>
       </div>
-      <!-- 右側視窗專屬即時測距標籤 (HUD B) -->
-      <div id="hud-b-badge" class="absolute top-14 right-3 z-10 pointer-events-none flex items-center space-x-1.5 bg-slate-900/85 backdrop-blur-md px-2.5 py-1 rounded-lg border border-slate-700 text-[11px] font-mono font-bold text-emerald-300 shadow-lg">
+      <!-- 右側視窗即時測距標籤 (HUD B) -->
+      <div id="hud-b-badge" class="absolute top-14 right-3 z-10 pointer-events-none flex items-center space-x-1.5 bg-slate-900/85 backdrop-blur-md px-2.5 py-1 rounded-lg border border-slate-700 text-[11px] font-mono font-bold text-emerald-300">
         <span>B 距離:</span>
         <span id="hud-b-dist-val" class="text-emerald-400">-- Å</span>
       </div>
@@ -85,9 +89,9 @@
     </div>
 
     <!-- 右側功能按鍵群 -->
-    <div class="flex items-center space-x-2 pointer-events-auto shrink-0">
+    <div class="flex items-center space-x-1.5 pointer-events-auto shrink-0">
       <!-- 左右分割對比開關 -->
-      <button id="btn-toggle-split" class="bg-slate-900/90 backdrop-blur-md border border-purple-500/50 hover:bg-slate-800 text-purple-300 px-2.5 py-1.5 rounded-xl text-xs font-semibold flex items-center space-x-1.5 transition shadow-lg" title="左右各放一個 PDB 同步對比">
+      <button id="btn-toggle-split" class="bg-slate-900/90 backdrop-blur-md border border-purple-500/50 hover:bg-slate-800 text-purple-300 px-2.5 py-1.5 rounded-xl text-xs font-semibold flex items-center space-x-1 transition shadow-lg" title="左右各放一個 PDB 同步對比">
         <i data-lucide="columns-2" class="w-3.5 h-3.5 text-purple-400"></i>
         <span>左右對比:</span>
         <span id="split-status" class="font-bold text-slate-400">OFF</span>
@@ -101,14 +105,14 @@
       </button>
 
       <!-- 平滑內插補幀開關 -->
-      <button id="btn-toggle-interpolate" class="bg-slate-900/90 backdrop-blur-md border border-cyan-500/50 hover:bg-slate-800 text-cyan-300 px-2.5 py-1.5 rounded-xl text-xs font-medium flex items-center space-x-1.5 transition shadow-lg" title="開啟 Spline 內插補幀，讓 60 幀動作極致平滑">
+      <button id="btn-toggle-interpolate" class="bg-slate-900/90 backdrop-blur-md border border-cyan-500/50 hover:bg-slate-800 text-cyan-300 px-2.5 py-1.5 rounded-xl text-xs font-medium flex items-center space-x-1 transition shadow-lg" title="開啟 Spline 內插補幀，讓動作極致平滑">
         <i data-lucide="activity" class="w-3.5 h-3.5 text-cyan-400"></i>
         <span class="hidden sm:inline">平滑:</span>
         <span id="interpolate-status" class="font-bold text-emerald-400">ON</span>
       </button>
 
       <!-- 特寫按鈕 -->
-      <button id="btn-focus-pair" title="特寫 K114 與 DG82 介面" class="bg-slate-900/90 backdrop-blur-md border border-amber-500/50 hover:bg-amber-950/40 text-amber-300 px-2.5 py-1.5 rounded-xl text-xs font-semibold flex items-center space-x-1.5 transition shadow-lg">
+      <button id="btn-focus-pair" title="特寫 K114 與 DG82 介面" class="bg-slate-900/90 backdrop-blur-md border border-amber-500/50 hover:bg-amber-950/40 text-amber-300 px-2.5 py-1.5 rounded-xl text-xs font-semibold flex items-center space-x-1 transition shadow-lg">
         <i data-lucide="sparkles" class="w-4 h-4 text-amber-400"></i>
         <span id="focus-btn-text">特寫 K114 - DG82</span>
       </button>
@@ -200,8 +204,10 @@
         </div>
 
         <div class="flex items-center space-x-1.5">
-          <span id="active-speed-tag" class="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 border border-slate-700 text-emerald-300 font-bold">10 FPS</span>
-          <button id="btn-speed" class="px-2 py-0.5 rounded-lg text-[11px] font-mono bg-slate-800 border border-slate-700 text-slate-300 hover:text-cyan-300 transition">
+          <span id="active-speed-tag" class="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 border border-slate-700 text-emerald-300 font-bold">
+            10 FPS
+          </span>
+          <button id="btn-speed" class="px-2 py-0.5 rounded-lg text-[11px] font-mono bg-slate-800 border border-slate-700 text-slate-300 hover:text-cyan-300 transition" title="點擊切換速率">
             <span id="speed-label">速度</span>
           </button>
         </div>
@@ -211,10 +217,10 @@
 
   <script>
     const AA_MAP = {
-      'ALA':'A','ARG':'R','ASN':'N','ASP':'D','CYS':'C','CYM':'C','CYX':'C',
-      'GLN':'Q','GLU':'E','GLY':'G','HIS':'H','HID':'H','HIE':'H','HIP':'H',
-      'ILE':'I','LEU':'L','LYS':'K','MET':'M','PHE':'F','PRO':'P','SER':'S',
-      'THR':'T','TRP':'W','TYR':'Y','VAL':'V'
+      'ALA': 'A', 'ARG': 'R', 'ASN': 'N', 'ASP': 'D', 'CYS': 'C', 'CYM': 'C', 'CYX': 'C',
+      'GLN': 'Q', 'GLU': 'E', 'GLY': 'G', 'HIS': 'H', 'HID': 'H', 'HIE': 'H', 'HIP': 'H',
+      'ILE': 'I', 'LEU': 'L', 'LYS': 'K', 'MET': 'M', 'PHE': 'F', 'PRO': 'P', 'SER': 'S',
+      'THR': 'T', 'TRP': 'W', 'TYR': 'Y', 'VAL': 'V'
     };
 
     const STANDARD_ANCHOR_W = 108;
@@ -248,7 +254,6 @@
 
       interpolateOn: true,
       interpolateStep: 6,
-
       isFocusMode: false,
 
       actualKResnoInPdbA: null,
@@ -309,7 +314,6 @@
       btnLoopMode: document.getElementById('btn-loop-mode'),
       loopLabel: document.getElementById('loop-label'),
       btnSpeed: document.getElementById('btn-speed'),
-      speedLabel: document.getElementById('speed-label'),
       activeSpeedTag: document.getElementById('active-speed-tag'),
 
       btnResetView: document.getElementById('btn-reset-view'),
@@ -343,6 +347,49 @@
       appState.ssSchemeIds = {
         pymol_ss: NGL.ColormakerRegistry.addScheme(makeSS(0xFF0000, 0xFFFF00, 0x00E000), 'pymol_ss')
       };
+    }
+
+    // β-sheet 末端立體箭頭修補函式
+    function installArrowPatch() {
+      try {
+        const Cart = NGL.RepresentationRegistry.get('cartoon');
+        if (!Cart || Cart.prototype.__arrowPatched) return;
+        const origGetSpline = Cart.prototype.getSpline;
+        Cart.prototype.getSpline = function (polymer) {
+          const spline = origGetSpline.call(this, polymer);
+          const origSize = spline.getSubdividedSize;
+          spline.getSubdividedSize = function (params) {
+            const out = origSize.call(this, params);
+            if (!polymer.isProtein()) return out;
+            try {
+              const size = out.size, m = this.subdiv, n = polymer.residueCount;
+              const st = polymer.structure, rp = st.getResidueProxy();
+              const HEAD = 1.8;
+              let runStart = -1;
+              for (let r = 0; r <= n; r++) {
+                let isE = false;
+                if (r < n) { rp.index = polymer.residueIndexStart + r; isE = (rp.sstruc === 'e' || rp.sstruc === 'b'); }
+                if (isE) { if (runStart < 0) runStart = r; continue; }
+                if (runStart >= 0) {
+                  const b = r - 1;
+                  if (b - runStart >= 1) {
+                    const i0 = (b - 1) * m + Math.floor(m / 2);
+                    const i1 = Math.min(size.length - 1, b * m + Math.floor(m / 2));
+                    const S = size[b * m] * HEAD;
+                    const tipRef = (b + 1) * m < size.length ? size[Math.min(size.length - 1, (b + 1) * m)] : size[b * m] * 0.1;
+                    const tip = Math.min(tipRef, S * 0.3);
+                    for (let i = i0; i <= i1; i++) size[i] = S + (tip - S) * ((i - i0) / Math.max(1, i1 - i0));
+                  }
+                  runStart = -1;
+                }
+              }
+            } catch (e) {}
+            return out;
+          };
+          return spline;
+        };
+        Cart.prototype.__arrowPatched = true;
+      } catch (e) {}
     }
 
     function computeDSSP(structure) {
@@ -515,16 +562,8 @@
         }
         if (curGroup.length > 0) strandGroups.push(curGroup);
 
-        appState.dnaStrandSelectionsA = strandGroups.map(grp => {
-          return `(${grp[0].resno}-${grp[grp.length - 1].resno} and not protein and not hydrogen)`;
-        });
-
-        appState.dnaRungStubsA = nucleicResList.map(item => ({
-          anchor: item.c1Index,
-          target: item.ringIndex,
-          resname: item.resname,
-          resno: item.resno
-        }));
+        appState.dnaStrandSelectionsA = strandGroups.map(grp => `(${grp[0].resno}-${grp[grp.length - 1].resno} and not protein and not hydrogen)`);
+        appState.dnaRungStubsA = nucleicResList.map(item => ({ anchor: item.c1Index, target: item.ringIndex, resname: item.resname, resno: item.resno }));
       }
     }
 
@@ -664,7 +703,7 @@
             r.eachAtom(a => {
               const an = a.atomname.trim();
               if (an === 'O6' || an === 'N7' || an === 'OP1' || an === 'OP2') {
-                dgAtomsB.push({ index: a.index, x: a.x, y: a.y, z: a.z, isO6: an === 'O6' });
+                dgAtomsB.push({ index: a.index, name: an, x: a.x, y: a.y, z: a.z, isO6: an === 'O6' });
               }
             });
           }
@@ -950,7 +989,7 @@
       }
     }
 
-    // 嚴格三維 Kabsch 演算法
+    // 嚴格三維 Kabsch 演算法 (回傳 16 元素 column-major 陣列)
     function computeKabschTransform(ptsP, ptsQ) {
       const n = ptsP.length;
       if (n < 3) return null;
@@ -1047,7 +1086,7 @@
       }
       const detUV = R_cand[0][0] * (R_cand[1][1]*R_cand[2][2] - R_cand[1][2]*R_cand[2][1])
                   - R_cand[0][1] * (R_cand[1][0]*R_cand[2][2] - R_cand[1][2]*R_cand[2][0])
-                  + R_cand[0][2] * (R_cand[1][0]*R_cand[2][1] - R_cand[1][1]*R_cand[2][0]);
+                  + R_cand[0][2] * (R_cand[1][0]*R_cand[2][2] - R_cand[1][1]*R_cand[2][0]);
 
       const E = [ [1,0,0], [0,1,0], [0,0, (detUV < 0 ? -1 : 1)] ];
       const R = [ [0,0,0], [0,0,0], [0,0,0] ];
@@ -1135,7 +1174,8 @@
         appState.trajectoryA.setFrame(f);
       }
       if (appState.trajectoryB) {
-        const frameB = f % (appState.totalFramesB || 1);
+        const totalB = Math.max(appState.trajectoryB.frameCount || 1, appState.totalFramesB || 1);
+        const frameB = f % totalB;
         appState.trajectoryB.setFrame(frameB);
         appState.stageB.viewer.requestRender();
       }
@@ -1210,7 +1250,10 @@
     function toggleFocus() {
       if (!appState.compA) return;
       appState.isFocusMode = !appState.isFocusMode;
-      updateDynamicInteractionsAndHUD(appState.compA.structure, appState.compB ? appState.compB.structure : null);
+
+      const stA = appState.compA ? appState.compA.structure : null;
+      const stB = appState.compB ? appState.compB.structure : null;
+      updateDynamicInteractionsAndHUD(stA, stB);
 
       if (appState.isFocusMode) {
         dom.btnFocusPair.classList.add('bg-amber-500/30', 'border-amber-400');
@@ -1340,10 +1383,6 @@
             appState.totalFramesB = count || 1;
             const typeStr = (count > 1) ? `[軌跡: ${count} 幀]` : `[單結構]`;
             dom.badgeTitleB.textContent = `視窗 B: ${url.replace(/\.pdb(\.gz)?$/i, '')} ${typeStr}`;
-            
-            if (appState.isPlaying) {
-              startPlayback();
-            }
           };
 
           trajCompB.trajectory.signals.countChanged.add(handleCountB);
@@ -1354,7 +1393,7 @@
 
         comp.autoView(500);
 
-        // 執行靠鹼基鎖定頭尾的 DNA 對齊
+        // 執行 DNA 鹼基非對稱原子對齊
         alignDnaBasesHorn();
 
       } catch (err) {
@@ -1384,7 +1423,7 @@
       if (dom.fileSelectorB.value) {
         loadPdbFileB(dom.fileSelectorB.value);
       } else {
-        alignDnaBasesHorn();
+        alignStructureBToA();
       }
     }
 
@@ -1512,7 +1551,7 @@
         dom.syncStatus.className = appState.syncCamera ? 'font-bold text-emerald-400' : 'font-bold text-slate-500';
 
         if (appState.syncCamera) {
-          alignDnaBasesHorn();
+          alignStructureBToA();
         }
       });
 
