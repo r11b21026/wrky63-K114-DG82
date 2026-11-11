@@ -4,46 +4,24 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>WRKY63 左右雙分割對比分子播放器</title>
-  <!-- Tailwind CSS & Lucide Icons -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
-  <!-- NGL Viewer WebGL 渲染引擎 -->
   <script src="https://cdn.jsdelivr.net/npm/ngl@2.0.0-dev.37/dist/ngl.js"></script>
 
   <style>
     html, body {
-      margin: 0;
-      padding: 0;
-      width: 100%;
-      height: 100%;
-      overflow: hidden;
-      background-color: #0b0f19;
-      color: #e2e8f0;
-      user-select: none;
-      touch-action: none;
+      margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden;
+      background-color: #0b0f19; color: #e2e8f0; user-select: none; touch-action: none;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     }
-    input[type=range] {
-      accent-color: #38bdf8;
-    }
-
-    .custom-bottom-timeline {
-      bottom: calc(2.8rem + env(safe-area-inset-bottom, 0px));
-    }
-    @media (min-width: 640px) {
-      .custom-bottom-timeline {
-        bottom: 1.8rem;
-      }
-    }
-    .pulse-danger {
-      box-shadow: 0 0 15px rgba(239, 68, 68, 0.6);
-      border-color: #ef4444 !important;
-    }
+    input[type=range] { accent-color: #38bdf8; }
+    .custom-bottom-timeline { bottom: calc(2.8rem + env(safe-area-inset-bottom, 0px)); }
+    @media (min-width: 640px) { .custom-bottom-timeline { bottom: 1.8rem; } }
+    .pulse-danger { box-shadow: 0 0 15px rgba(239, 68, 68, 0.6); border-color: #ef4444 !important; }
   </style>
 </head>
 <body class="w-screen h-screen relative bg-[#0b0f19] flex flex-col">
 
-  <!-- 3D 渲染視窗容器 (左右分割，兩側尺寸獨立即時置中) -->
   <div id="viewport-container" class="w-full h-full relative flex flex-row overflow-hidden">
     <!-- 左側視窗 (結構 A) -->
     <div id="viewport-a" class="w-full h-full relative cursor-grab active:cursor-grabbing">
@@ -53,88 +31,64 @@
       </div>
     </div>
 
-    <!-- 右側視窗 (結構 B - 左右對比時展開) -->
+    <!-- 右側視窗 (結構 B) -->
     <div id="viewport-b" class="hidden w-1/2 h-full relative cursor-grab active:cursor-grabbing border-l border-slate-700/80">
       <div class="absolute top-14 left-3 z-10 pointer-events-none flex items-center space-x-1.5 bg-slate-900/80 backdrop-blur-md px-2.5 py-1 rounded-lg border border-cyan-500/40 text-[11px] font-mono font-bold text-cyan-300 shadow-lg">
         <span class="w-2 h-2 rounded-full bg-cyan-400"></span>
         <span id="badge-title-b">視窗 B (對比結構)</span>
       </div>
-      <!-- 右側視窗專屬即時測距標籤 (HUD B) -->
       <div id="hud-b-badge" class="absolute top-14 right-3 z-10 pointer-events-none flex items-center space-x-1.5 bg-slate-900/85 backdrop-blur-md px-2.5 py-1 rounded-lg border border-slate-700 text-[11px] font-mono font-bold text-emerald-300 shadow-lg">
         <span>B 距離:</span>
-        <span id="hud-b-dist-val" class="text-emerald-400">2.68 Å</span>
+        <span id="hud-b-dist-val" class="text-emerald-400">-- Å</span>
       </div>
     </div>
   </div>
 
-  <!-- 頂部控制列 -->
   <header class="absolute top-3 left-3 right-3 z-20 flex flex-wrap items-center justify-between pointer-events-none gap-2">
-    <!-- 左側：檔案 A 選單 -->
     <div class="bg-slate-900/90 backdrop-blur-md border border-slate-700/80 rounded-xl px-2.5 py-1.5 flex items-center space-x-2 pointer-events-auto shadow-lg max-w-xs sm:max-w-sm w-full">
-      <span class="w-2.5 h-2.5 rounded-full bg-cyan-400 shrink-0" title="結構 A"></span>
+      <span class="w-2.5 h-2.5 rounded-full bg-cyan-400 shrink-0"></span>
       <select id="file-selector-a" class="bg-slate-800 border border-slate-700 text-cyan-200 text-xs rounded-lg px-2 py-1 w-full truncate focus:outline-none cursor-pointer">
         <option value="" disabled selected>搜尋檔案 A 中...</option>
       </select>
     </div>
 
-    <!-- 中間：右側檔案 B 選單 (開啟左右對比時呈現) -->
     <div id="file-box-b" class="hidden bg-slate-900/90 backdrop-blur-md border border-cyan-500/40 rounded-xl px-2.5 py-1.5 flex items-center space-x-2 pointer-events-auto shadow-lg max-w-xs sm:max-w-sm w-full">
-      <span class="w-2.5 h-2.5 rounded-full bg-cyan-400 shrink-0" title="結構 B"></span>
+      <span class="w-2.5 h-2.5 rounded-full bg-cyan-400 shrink-0"></span>
       <select id="file-selector-b" class="bg-slate-800 border border-slate-700 text-cyan-200 text-xs rounded-lg px-2 py-1 w-full truncate focus:outline-none cursor-pointer">
         <option value="" disabled selected>選擇對比檔案 B...</option>
       </select>
     </div>
 
-    <!-- 右側功能按鍵群 -->
     <div class="flex items-center space-x-1.5 pointer-events-auto shrink-0">
-      <!-- 左右分割對比開關 -->
-      <button id="btn-toggle-split" class="bg-slate-900/90 backdrop-blur-md border border-purple-500/50 hover:bg-slate-800 text-purple-300 px-2.5 py-1.5 rounded-xl text-xs font-semibold flex items-center space-x-1 transition shadow-lg" title="左右各放一個 PDB 同步對比">
+      <button id="btn-toggle-split" class="bg-slate-900/90 backdrop-blur-md border border-purple-500/50 hover:bg-slate-800 text-purple-300 px-2.5 py-1.5 rounded-xl text-xs font-semibold flex items-center space-x-1 transition shadow-lg">
         <i data-lucide="columns-2" class="w-3.5 h-3.5 text-purple-400"></i>
         <span>左右對比:</span>
         <span id="split-status" class="font-bold text-slate-400">OFF</span>
       </button>
 
-      <!-- 視角同步旋轉開關 -->
-      <button id="btn-toggle-sync" class="hidden bg-slate-900/90 backdrop-blur-md border border-blue-500/50 hover:bg-slate-800 text-blue-300 px-2 py-1.5 rounded-xl text-xs font-medium flex items-center space-x-1 transition shadow-lg" title="同步視角角度">
+      <button id="btn-toggle-sync" class="hidden bg-slate-900/90 backdrop-blur-md border border-blue-500/50 hover:bg-slate-800 text-blue-300 px-2 py-1.5 rounded-xl text-xs font-medium flex items-center space-x-1 transition shadow-lg">
         <i data-lucide="link" class="w-3.5 h-3.5 text-blue-400"></i>
         <span class="hidden sm:inline">視角同步:</span>
         <span id="sync-status" class="font-bold text-emerald-400">ON</span>
       </button>
 
-      <!-- 座標對齊控制選單 -->
-      <div id="align-box" class="hidden bg-slate-900/90 backdrop-blur-md border border-indigo-500/50 rounded-xl px-2 py-1 flex items-center space-x-1 shadow-lg">
-        <span class="text-[10px] text-indigo-300 font-medium hidden sm:inline">座標:</span>
-        <select id="align-mode-select" class="bg-slate-800 border border-slate-700 text-indigo-200 text-xs rounded px-1.5 py-0.5 focus:outline-none cursor-pointer">
-          <option value="keep_vmd" selected>保持原始座標 (VMD已對齊)</option>
-          <option value="protein_ca">NGL 重對齊 (蛋白質骨架CA)</option>
-          <option value="dna_heavy">NGL 重對齊 (DNA重原子)</option>
-        </select>
-        <button id="btn-realign" class="p-1 hover:bg-slate-800 rounded text-indigo-300" title="執行對齊">
-          <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
-        </button>
-      </div>
-
-      <!-- 平滑內插補幀開關 -->
-      <button id="btn-toggle-interpolate" class="bg-slate-900/90 backdrop-blur-md border border-cyan-500/50 hover:bg-slate-800 text-cyan-300 px-2.5 py-1.5 rounded-xl text-xs font-medium flex items-center space-x-1 transition shadow-lg" title="開啟 Spline 樣條內插補幀，讓動作極致平滑">
+      <button id="btn-toggle-interpolate" class="bg-slate-900/90 backdrop-blur-md border border-cyan-500/50 hover:bg-slate-800 text-cyan-300 px-2.5 py-1.5 rounded-xl text-xs font-medium flex items-center space-x-1 transition shadow-lg">
         <i data-lucide="activity" class="w-3.5 h-3.5 text-cyan-400"></i>
         <span class="hidden sm:inline">平滑:</span>
         <span id="interpolate-status" class="font-bold text-emerald-400">ON</span>
       </button>
 
-      <!-- 特寫按鈕 (兩邊同時特寫透明化並顯示鍵結) -->
-      <button id="btn-focus-pair" title="特寫 K114 與 DG82 介面 (雙側同時聚焦透明化)" class="bg-slate-900/90 backdrop-blur-md border border-amber-500/50 hover:bg-amber-950/40 text-amber-300 px-2.5 py-1.5 rounded-xl text-xs font-semibold flex items-center space-x-1 transition shadow-lg">
+      <button id="btn-focus-pair" class="bg-slate-900/90 backdrop-blur-md border border-amber-500/50 hover:bg-amber-950/40 text-amber-300 px-2.5 py-1.5 rounded-xl text-xs font-semibold flex items-center space-x-1 transition shadow-lg">
         <i data-lucide="sparkles" class="w-4 h-4 text-amber-400"></i>
         <span id="focus-btn-text">特寫 K114 - DG82</span>
       </button>
 
-      <!-- 重設視角按鈕 (R) -->
-      <button id="btn-reset-view" title="重設整體視角 (R)" class="bg-slate-900/90 backdrop-blur-md border border-slate-700/80 hover:bg-slate-800 text-slate-300 hover:text-white p-2 rounded-xl text-xs transition shadow-lg shrink-0">
+      <button id="btn-reset-view" class="bg-slate-900/90 backdrop-blur-md border border-slate-700/80 hover:bg-slate-800 text-slate-300 hover:text-white p-2 rounded-xl text-xs transition shadow-lg shrink-0">
         <i data-lucide="maximize" class="w-4 h-4"></i>
       </button>
     </div>
   </header>
 
-  <!-- 左上方 HUD：即時距離監控面板 (左側結構 A 測距) -->
   <div id="hud-panel" class="absolute top-24 left-3 z-20 bg-slate-900/90 backdrop-blur-md border border-slate-700/80 rounded-2xl p-3 pointer-events-none shadow-xl flex flex-col space-y-2 min-w-[210px] transition-all duration-300">
     <div class="flex items-center justify-between border-b border-slate-800 pb-1.5">
       <span class="text-[11px] font-bold text-slate-300 flex items-center gap-1.5">
@@ -148,12 +102,12 @@
 
     <div class="flex items-baseline justify-between">
       <span class="text-xs text-slate-400">即時中心距離:</span>
-      <span id="hud-distance-val" class="text-lg font-mono font-bold text-emerald-400">2.80 Å</span>
+      <span id="hud-distance-val" class="text-lg font-mono font-bold text-emerald-400">-- Å</span>
     </div>
 
     <div class="w-full bg-slate-800 h-2 rounded-full overflow-hidden flex relative">
       <div id="hud-dist-bar" class="h-full bg-emerald-500 transition-all duration-150" style="width: 28%;"></div>
-      <div class="absolute top-0 bottom-0 left-[50%] w-0.5 bg-rose-500/80 z-10" title="3.5 Å 截斷門檻"></div>
+      <div class="absolute top-0 bottom-0 left-[50%] w-0.5 bg-rose-500/80 z-10"></div>
     </div>
     <div class="flex justify-between text-[9px] font-mono text-slate-500 px-0.5">
       <span>2.0 Å</span>
@@ -162,27 +116,15 @@
     </div>
   </div>
 
-  <!-- 鹼基圖例 (右上極簡懸浮) -->
-  <div id="base-legend" class="absolute top-16 right-3 z-20 bg-slate-900/85 backdrop-blur-md border border-slate-700/70 rounded-xl px-2.5 py-1.5 pointer-events-none shadow-lg text-[10px] font-mono flex items-center gap-2">
-    <span class="text-slate-400 font-bold border-r border-slate-700 pr-1.5">DNA</span>
-    <div class="flex items-center space-x-1"><span class="w-2 h-2 rounded-full" style="background:#3859F2"></span><span class="text-slate-300">A</span></div>
-    <div class="flex items-center space-x-1"><span class="w-2 h-2 rounded-full" style="background:#EB4759"></span><span class="text-slate-300">T</span></div>
-    <div class="flex items-center space-x-1"><span class="w-2 h-2 rounded-full" style="background:#F29433"></span><span class="text-slate-300">C</span></div>
-    <div class="flex items-center space-x-1"><span class="w-2 h-2 rounded-full" style="background:#26CC40"></span><span class="text-slate-300">G</span></div>
-  </div>
-
-  <!-- 讀取狀態遮罩 -->
-  <div id="loading-overlay" class="absolute inset-0 z-50 bg-black/60 backdrop-blur-sm flex flex-col items-center justify-center transition-opacity duration-200 pointer-events-none">
+  <div id="loading-overlay" class="absolute inset-0 z-50 bg-black/60 backdrop-blur-sm flex flex-col items-center justify-center transition-opacity duration-200">
     <div class="bg-slate-900 border border-cyan-500/40 rounded-2xl p-5 flex flex-col items-center space-y-2.5 shadow-2xl">
       <div class="w-8 h-8 border-4 border-cyan-500/30 border-t-cyan-400 rounded-full animate-spin"></div>
       <div class="text-xs font-mono text-cyan-300 font-bold" id="loading-text">載入結構中...</div>
     </div>
   </div>
 
-  <!-- 底部軌跡播放控制器 (同步控制 A 與 B) -->
   <footer id="bottom-timeline" class="hidden absolute custom-bottom-timeline left-3 right-3 sm:left-12 sm:right-12 z-20 pointer-events-none flex flex-col items-center">
     <div class="bg-slate-900/95 backdrop-blur-md border border-slate-700/80 w-full max-w-lg rounded-2xl px-4 py-2.5 shadow-2xl pointer-events-auto flex flex-col gap-2">
-      <!-- 幀數拉桿 -->
       <div class="flex items-center space-x-2.5 w-full font-mono text-xs">
         <span class="text-cyan-300 w-8 text-right" id="slider-curr-frame">0</span>
         <input id="trajectory-slider" type="range" min="0" max="0" value="0" step="1" 
@@ -190,15 +132,12 @@
         <span class="text-slate-400 w-8 text-left" id="slider-total-frame">0</span>
       </div>
 
-      <!-- 播放控制按鈕列 -->
       <div class="flex items-center justify-between w-full">
-        <!-- 循環模式 -->
         <button id="btn-loop-mode" class="px-2 py-1 rounded-lg text-xs font-mono bg-slate-800 border border-slate-700 text-cyan-400 hover:text-white transition flex items-center space-x-1">
           <i data-lucide="repeat" class="w-3 h-3"></i>
           <span id="loop-label">循環</span>
         </button>
 
-        <!-- 播放主按鍵 -->
         <div class="flex items-center space-x-1">
           <button id="btn-first-frame" class="p-1.5 rounded-lg hover:bg-slate-800 text-slate-300 hover:text-white transition">
             <i data-lucide="skip-back" class="w-4 h-4"></i>
@@ -217,12 +156,9 @@
           </button>
         </div>
 
-        <!-- 播放速率切換 -->
         <div class="flex items-center space-x-1.5">
-          <span id="active-speed-tag" class="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 border border-slate-700 text-emerald-300 font-bold">
-            10 FPS
-          </span>
-          <button id="btn-speed" class="px-2 py-0.5 rounded-lg text-[11px] font-mono bg-slate-800 border border-slate-700 text-slate-300 hover:text-cyan-300 transition" title="點擊切換速率">
+          <span id="active-speed-tag" class="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 border border-slate-700 text-emerald-300 font-bold">10 FPS</span>
+          <button id="btn-speed" class="px-2 py-0.5 rounded-lg text-[11px] font-mono bg-slate-800 border border-slate-700 text-slate-300 hover:text-cyan-300 transition">
             <span id="speed-label">速度</span>
           </button>
         </div>
@@ -232,72 +168,27 @@
 
   <script>
     const AA_MAP = {
-      'ALA': 'A', 'ARG': 'R', 'ASN': 'N', 'ASP': 'D', 'CYS': 'C', 'CYM': 'C', 'CYX': 'C',
-      'GLN': 'Q', 'GLU': 'E', 'GLY': 'G', 'HIS': 'H', 'HID': 'H', 'HIE': 'H', 'HIP': 'H',
-      'ILE': 'I', 'LEU': 'L', 'LYS': 'K', 'MET': 'M', 'PHE': 'F', 'PRO': 'P', 'SER': 'S',
-      'THR': 'T', 'TRP': 'W', 'TYR': 'Y', 'VAL': 'V'
+      'ALA':'A','ARG':'R','ASN':'N','ASP':'D','CYS':'C','CYM':'C','CYX':'C',
+      'GLN':'Q','GLU':'E','GLY':'G','HIS':'H','HID':'H','HIE':'H','HIP':'H',
+      'ILE':'I','LEU':'L','LYS':'K','MET':'M','PHE':'F','PRO':'P','SER':'S',
+      'THR':'T','TRP':'W','TYR':'Y','VAL':'V'
     };
 
-    // 核心基準編號：以 WRKYGQK 中的 W108 為基準
     const STANDARD_ANCHOR_W = 108;
     const STANDARD_TARGET_K = 114;
     const STANDARD_TARGET_DG = 82;
 
     const appState = {
-      stageA: null,
-      stageB: null,
-      
-      // 結構 A
-      compA: null,
-      trajCompA: null,
-      trajectoryA: null,
-      totalFramesA: 1,
-      currentFrameA: 0,
-
-      // 結構 B
-      compB: null,
-      trajCompB: null,
-      trajectoryB: null,
-      totalFramesB: 1,
-
-      // 左右分割與雙向視角同步
-      isSplitMode: false,
-      syncCamera: true,
-      isSyncingCam: false,
-      alignMode: 'keep_vmd', // 預設：保持原始座標 (VMD已對齊)
-
-      // 播放控制
-      isPlaying: false,
-      fps: 10,
-      loopMode: 'loop',
-      direction: 1,
-
-      // 平滑內插補幀
-      interpolateOn: true,
-      interpolateStep: 6,
-
-      isFocusMode: true,
-
-      actualKResnoInPdbA: null,
-      actualDGResnoInPdbA: null,
-      dynamicPairsA: [],
-      currentDistance: 2.8,
-      focusLabelsCompA: null,
-
-      actualKResnoInPdbB: null,
-      actualDGResnoInPdbB: null,
-      dynamicPairsB: [],
-      currentDistanceB: 2.8,
-      focusLabelsCompB: null,
-
-      dnaStrandSelectionsA: [],
-      dnaRungStubsA: [],
-      ladderShapeCompA: null,
-
-      dnaStrandSelectionsB: [],
-      dnaRungStubsB: [],
-      ladderShapeCompB: null,
-
+      stageA: null, stageB: null,
+      compA: null, trajCompA: null, trajectoryA: null, totalFramesA: 1, currentFrameA: 0,
+      compB: null, trajCompB: null, trajectoryB: null, totalFramesB: 1,
+      isSplitMode: false, syncCamera: true, isSyncingCam: false,
+      isPlaying: false, fps: 10, loopMode: 'loop', direction: 1, timerId: null,
+      interpolateOn: true, interpolateStep: 6, isFocusMode: true,
+      actualKResnoInPdbA: null, actualDGResnoInPdbA: null, dynamicPairsA: [], currentDistance: 2.8, focusLabelsCompA: null,
+      actualKResnoInPdbB: null, actualDGResnoInPdbB: null, dynamicPairsB: [], currentDistanceB: 2.8, focusLabelsCompB: null,
+      dnaStrandSelectionsA: [], dnaRungStubsA: [], ladderShapeCompA: null,
+      dnaStrandSelectionsB: [], dnaRungStubsB: [], ladderShapeCompB: null,
       ssSchemeIds: null
     };
 
@@ -313,19 +204,12 @@
       fileSelectorA: document.getElementById('file-selector-a'),
       fileSelectorB: document.getElementById('file-selector-b'),
       fileBoxB: document.getElementById('file-box-b'),
-
       btnToggleSplit: document.getElementById('btn-toggle-split'),
       splitStatus: document.getElementById('split-status'),
       btnToggleSync: document.getElementById('btn-toggle-sync'),
       syncStatus: document.getElementById('sync-status'),
-      alignBox: document.getElementById('align-box'),
-      alignModeSelect: document.getElementById('align-mode-select'),
-      btnRealign: document.getElementById('btn-realign'),
-
       btnToggleInterpolate: document.getElementById('btn-toggle-interpolate'),
       interpolateStatus: document.getElementById('interpolate-status'),
-
-      baseLegend: document.getElementById('base-legend'),
       loadingOverlay: document.getElementById('loading-overlay'),
       loadingText: document.getElementById('loading-text'),
       bottomTimeline: document.getElementById('bottom-timeline'),
@@ -340,9 +224,7 @@
       btnLoopMode: document.getElementById('btn-loop-mode'),
       loopLabel: document.getElementById('loop-label'),
       btnSpeed: document.getElementById('btn-speed'),
-      speedLabel: document.getElementById('speed-label'),
       activeSpeedTag: document.getElementById('active-speed-tag'),
-
       btnResetView: document.getElementById('btn-reset-view'),
       btnFocusPair: document.getElementById('btn-focus-pair'),
       focusBtnText: document.getElementById('focus-btn-text'),
@@ -374,48 +256,6 @@
       appState.ssSchemeIds = {
         pymol_ss: NGL.ColormakerRegistry.addScheme(makeSS(0xFF0000, 0xFFFF00, 0x00E000), 'pymol_ss')
       };
-    }
-
-    function installArrowPatch() {
-      try {
-        const Cart = NGL.RepresentationRegistry.get('cartoon');
-        if (!Cart || Cart.prototype.__arrowPatched) return;
-        const origGetSpline = Cart.prototype.getSpline;
-        Cart.prototype.getSpline = function (polymer) {
-          const spline = origGetSpline.call(this, polymer);
-          const origSize = spline.getSubdividedSize;
-          spline.getSubdividedSize = function (params) {
-            const out = origSize.call(this, params);
-            if (!polymer.isProtein()) return out;
-            try {
-              const size = out.size, m = this.subdiv, n = polymer.residueCount;
-              const st = polymer.structure, rp = st.getResidueProxy();
-              const HEAD = 1.8;
-              let runStart = -1;
-              for (let r = 0; r <= n; r++) {
-                let isE = false;
-                if (r < n) { rp.index = polymer.residueIndexStart + r; isE = (rp.sstruc === 'e' || rp.sstruc === 'b'); }
-                if (isE) { if (runStart < 0) runStart = r; continue; }
-                if (runStart >= 0) {
-                  const b = r - 1;
-                  if (b - runStart >= 1) {
-                    const i0 = (b - 1) * m + Math.floor(m / 2);
-                    const i1 = Math.min(size.length - 1, b * m + Math.floor(m / 2));
-                    const S = size[b * m] * HEAD;
-                    const tipRef = (b + 1) * m < size.length ? size[Math.min(size.length - 1, (b + 1) * m)] : size[b * m] * 0.1;
-                    const tip = Math.min(tipRef, S * 0.3);
-                    for (let i = i0; i <= i1; i++) size[i] = S + (tip - S) * ((i - i0) / Math.max(1, i1 - i0));
-                  }
-                  runStart = -1;
-                }
-              }
-            } catch (e) {}
-            return out;
-          };
-          return spline;
-        };
-        Cart.prototype.__arrowPatched = true;
-      } catch (e) {}
     }
 
     function computeDSSP(structure) {
@@ -519,7 +359,7 @@
       } catch (e) {}
     }
 
-    function analyzeStructureForStageA(structure) {
+    function parseStructureAnalysis(structure, isStageA) {
       const nucleicResList = [];
       const protResList = [];
       const dnaResnos = [];
@@ -542,99 +382,11 @@
             });
             if (!backboneAtom) r.eachAtom(a => { if (!backboneAtom) backboneAtom = a.index; });
             if (!baseRing) baseRing = backboneAtom;
-
-            nucleicResList.push({
-              resno: r.resno,
-              chain: (r.chainname || 'A').trim(),
-              resname: rn,
-              o3: o3, p: p,
-              c1Index: backboneAtom,
-              ringIndex: baseRing
-            });
+            nucleicResList.push({ resno: r.resno, chain: (r.chainname || 'A').trim(), resname: rn, o3, p, c1Index: backboneAtom, ringIndex: baseRing });
           }
         }
       });
 
-      const seqStr = protResList.map(x => x.code).join('');
-      const motifIdx = seqStr.indexOf('WRKYGQK');
-
-      let deltaOffset = 0;
-      if (motifIdx !== -1) {
-        const wInPdb = protResList[motifIdx].resno;
-        deltaOffset = STANDARD_ANCHOR_W - wInPdb;
-      } else {
-        const sampleW = protResList.find(r => r.code === 'W');
-        if (sampleW) deltaOffset = STANDARD_ANCHOR_W - sampleW.resno;
-      }
-      appState.actualKResnoInPdbA = STANDARD_TARGET_K - deltaOffset;
-
-      if (dnaResnos.includes(STANDARD_TARGET_DG)) {
-        appState.actualDGResnoInPdbA = STANDARD_TARGET_DG;
-      } else if (dnaResnos.length > 0) {
-        appState.actualDGResnoInPdbA = dnaResnos.find(n => n === 82) || dnaResnos[0];
-      } else {
-        appState.actualDGResnoInPdbA = STANDARD_TARGET_DG;
-      }
-
-      if (nucleicResList.length > 0) {
-        const strandGroups = [];
-        let curGroup = [nucleicResList[0]];
-
-        for (let i = 0; i < nucleicResList.length - 1; i++) {
-          const r1 = nucleicResList[i], r2 = nucleicResList[i + 1];
-          let dist = 999;
-          if (r1.o3 && r2.p) dist = Math.hypot(r1.o3.x - r2.p.x, r1.o3.y - r2.p.y, r1.o3.z - r2.p.z);
-          if (dist > 4.5 || r1.resname.endsWith('3') || r2.resname.endsWith('5')) {
-            strandGroups.push(curGroup);
-            curGroup = [r2];
-          } else {
-            curGroup.push(r2);
-          }
-        }
-        if (curGroup.length > 0) strandGroups.push(curGroup);
-
-        appState.dnaStrandSelectionsA = strandGroups.map(grp => {
-          return `(${grp[0].resno}-${grp[grp.length - 1].resno} and not protein and not hydrogen)`;
-        });
-
-        appState.dnaRungStubsA = nucleicResList.map(item => ({
-          anchor: item.c1Index,
-          target: item.ringIndex,
-          resname: item.resname,
-          resno: item.resno
-        }));
-      }
-    }
-
-    function analyzeStructureForStageB(structure) {
-      const nucleicResList = [];
-      const protResList = [];
-      const dnaResnos = [];
-
-      structure.eachResidue(r => {
-        const rn = (r.resname || '').trim().toUpperCase();
-        if (r.isProtein()) {
-          protResList.push({ resno: r.resno, resname: rn, code: AA_MAP[rn] || 'X' });
-        } else {
-          const isDna = r.isNucleic() || /^(D[ATCG][35]?|[ATCG][35]?)$/.test(rn);
-          if (isDna) {
-            dnaResnos.push(r.resno);
-            let o3 = null, p = null, backboneAtom = null, baseRing = null;
-            r.eachAtom(a => {
-              const aname = a.atomname.trim();
-              if (aname === "O3'" || aname === "O3*") o3 = { x: a.x, y: a.y, z: a.z };
-              if (aname === "P") { p = { x: a.x, y: a.y, z: a.z }; backboneAtom = a.index; }
-              if (!backboneAtom && (aname === "C4'" || aname === "C3'" || aname === "C1'")) backboneAtom = a.index;
-              if (aname === "N1" || aname === "N3" || aname === "C4") { if (!baseRing || aname === "N1" || aname === "N3") baseRing = a.index; }
-            });
-            if (!backboneAtom) r.eachAtom(a => { if (!backboneAtom) backboneAtom = a.index; });
-            if (!baseRing) baseRing = backboneAtom;
-            nucleicResList.push({ resno: r.resno, resname: rn, o3, p, c1Index: backboneAtom, ringIndex: baseRing });
-          }
-        }
-      });
-
-      // 序列基準 W108 比對 (結構 B 亦套用以精準特寫)
       const seqStr = protResList.map(x => x.code).join('');
       const motifIdx = seqStr.indexOf('WRKYGQK');
       let deltaOffset = 0;
@@ -643,15 +395,14 @@
         const sampleW = protResList.find(r => r.code === 'W');
         if (sampleW) deltaOffset = STANDARD_ANCHOR_W - sampleW.resno;
       }
-      appState.actualKResnoInPdbB = STANDARD_TARGET_K - deltaOffset;
 
-      if (dnaResnos.includes(STANDARD_TARGET_DG)) {
-        appState.actualDGResnoInPdbB = STANDARD_TARGET_DG;
-      } else if (dnaResnos.length > 0) {
-        appState.actualDGResnoInPdbB = dnaResnos.find(n => n === 82) || dnaResnos[0];
-      } else {
-        appState.actualDGResnoInPdbB = STANDARD_TARGET_DG;
-      }
+      const actualK = STANDARD_TARGET_K - deltaOffset;
+      let actualDG = STANDARD_TARGET_DG;
+      if (dnaResnos.includes(STANDARD_TARGET_DG)) actualDG = STANDARD_TARGET_DG;
+      else if (dnaResnos.length > 0) actualDG = dnaResnos.find(n => n === 82) || dnaResnos[0];
+
+      let strandSelections = [];
+      let rungStubs = [];
 
       if (nucleicResList.length > 0) {
         const strandGroups = [];
@@ -667,43 +418,42 @@
         }
         if (curGroup.length > 0) strandGroups.push(curGroup);
 
-        appState.dnaStrandSelectionsB = strandGroups.map(grp => `(${grp[0].resno}-${grp[grp.length - 1].resno} and not protein and not hydrogen)`);
-        appState.dnaRungStubsB = nucleicResList.map(item => ({ anchor: item.c1Index, target: item.ringIndex, resname: item.resname, resno: item.resno }));
+        strandSelections = strandGroups.map(grp => `(${grp[0].resno}-${grp[grp.length - 1].resno} and not protein and not hydrogen)`);
+        rungStubs = nucleicResList.map(item => ({ anchor: item.c1Index, target: item.ringIndex, resname: item.resname, resno: item.resno }));
+      }
+
+      if (isStageA) {
+        appState.actualKResnoInPdbA = actualK;
+        appState.actualDGResnoInPdbA = actualDG;
+        appState.dnaStrandSelectionsA = strandSelections;
+        appState.dnaRungStubsA = rungStubs;
+      } else {
+        appState.actualKResnoInPdbB = actualK;
+        appState.actualDGResnoInPdbB = actualDG;
+        appState.dnaStrandSelectionsB = strandSelections;
+        appState.dnaRungStubsB = rungStubs;
       }
     }
 
-    // 即時測距與 HUD 更新 (視窗 A & 視窗 B 均測距)
     function updateDynamicInteractionsAndHUD(structureA, structureB) {
-      // 1. 測距結構 A
-      if (structureA) {
+      if (structureA && appState.actualKResnoInPdbA) {
         appState.dynamicPairsA = [];
-        const kAtomsA = [];
-        const dgAtomsA = [];
+        const kAtomsA = [], dgAtomsA = [];
 
         structureA.eachResidue(r => {
           const rn = (r.resname || '').trim().toUpperCase();
           if (r.resno === appState.actualKResnoInPdbA && (r.isProtein() || rn === 'LYS')) {
-            r.eachAtom(a => {
-              const aname = a.atomname.trim();
-              kAtomsA.push({ index: a.index, name: aname, x: a.x, y: a.y, z: a.z, isNZ: aname === 'NZ' });
-            });
+            r.eachAtom(a => { if (a.atomname.trim() === 'NZ') kAtomsA.push({ index: a.index, x: a.x, y: a.y, z: a.z }); });
           }
           if (r.resno === appState.actualDGResnoInPdbA) {
-            r.eachAtom(a => {
-              const aname = a.atomname.trim();
-              if (aname === 'O6' || aname === 'N7' || aname === 'OP1' || aname === 'OP2') {
-                dgAtomsA.push({ index: a.index, name: aname, x: a.x, y: a.y, z: a.z, isO6: aname === 'O6' });
-              }
-            });
+            r.eachAtom(a => { if (a.atomname.trim() === 'O6') dgAtomsA.push({ index: a.index, x: a.x, y: a.y, z: a.z }); });
           }
         });
 
         if (kAtomsA.length > 0 && dgAtomsA.length > 0) {
-          const nzA = kAtomsA.find(a => a.isNZ) || kAtomsA[0];
-          const tA = dgAtomsA.find(a => a.isO6) || dgAtomsA[0];
-          const distA = Math.hypot(nzA.x - tA.x, nzA.y - tA.y, nzA.z - tA.z);
+          const distA = Math.hypot(kAtomsA[0].x - dgAtomsA[0].x, kAtomsA[0].y - dgAtomsA[0].y, kAtomsA[0].z - dgAtomsA[0].z);
           appState.currentDistance = distA;
-          appState.dynamicPairsA.push([nzA.index, tA.index]);
+          appState.dynamicPairsA.push([kAtomsA[0].index, dgAtomsA[0].index]);
 
           dom.hudDistVal.textContent = `${distA.toFixed(2)} Å`;
           const pct = Math.min(100, Math.max(0, ((distA - 2.0) / (5.0 - 2.0)) * 100));
@@ -712,64 +462,42 @@
           if (distA <= 3.2) {
             dom.hudDistVal.className = 'text-lg font-mono font-bold text-emerald-400';
             dom.hudDistBar.className = 'h-full bg-emerald-500 transition-all duration-150';
-            dom.hudStateBadge.className = 'text-[9px] font-mono px-1.5 py-0.5 rounded font-bold bg-emerald-950/70 border border-emerald-500/50 text-emerald-300';
             dom.hudStateBadge.textContent = '氫鍵鎖定 (Stable)';
-            dom.statusIndicatorDot.className = 'w-2 h-2 rounded-full bg-emerald-400 animate-pulse';
-            dom.hudPanel.classList.remove('pulse-danger');
           } else if (distA <= 3.5) {
             dom.hudDistVal.className = 'text-lg font-mono font-bold text-yellow-400';
             dom.hudDistBar.className = 'h-full bg-yellow-500 transition-all duration-150';
-            dom.hudStateBadge.className = 'text-[9px] font-mono px-1.5 py-0.5 rounded font-bold bg-yellow-950/70 border border-yellow-500/50 text-yellow-300';
             dom.hudStateBadge.textContent = '接近邊界 (Stretched)';
-            dom.statusIndicatorDot.className = 'w-2 h-2 rounded-full bg-yellow-400';
-            dom.hudPanel.classList.remove('pulse-danger');
           } else {
             dom.hudDistVal.className = 'text-lg font-mono font-bold text-rose-400 animate-pulse';
             dom.hudDistBar.className = 'h-full bg-rose-500 transition-all duration-150';
-            dom.hudStateBadge.className = 'text-[9px] font-mono px-1.5 py-0.5 rounded font-bold bg-rose-950/80 border border-rose-500 text-rose-300';
             dom.hudStateBadge.textContent = '暫態呼吸越線 (Excursion)';
-            dom.statusIndicatorDot.className = 'w-2 h-2 rounded-full bg-rose-500 animate-ping';
-            dom.hudPanel.classList.add('pulse-danger');
           }
         }
       }
 
-      // 2. 測距結構 B (【解決右側沒有虛線】)
-      if (structureB && appState.actualKResnoInPdbB && appState.actualDGResnoInPdbB) {
+      if (structureB && appState.actualKResnoInPdbB) {
         appState.dynamicPairsB = [];
-        const kAtomsB = [];
-        const dgAtomsB = [];
+        const kAtomsB = [], dgAtomsB = [];
 
         structureB.eachResidue(r => {
           const rn = (r.resname || '').trim().toUpperCase();
           if (r.resno === appState.actualKResnoInPdbB && (r.isProtein() || rn === 'LYS')) {
-            r.eachAtom(a => {
-              const aname = a.atomname.trim();
-              kAtomsB.push({ index: a.index, name: aname, x: a.x, y: a.y, z: a.z, isNZ: aname === 'NZ' });
-            });
+            r.eachAtom(a => { if (a.atomname.trim() === 'NZ') kAtomsB.push({ index: a.index, x: a.x, y: a.y, z: a.z }); });
           }
           if (r.resno === appState.actualDGResnoInPdbB) {
-            r.eachAtom(a => {
-              const aname = a.atomname.trim();
-              if (aname === 'O6' || aname === 'N7' || aname === 'OP1' || aname === 'OP2') {
-                dgAtomsB.push({ index: a.index, name: aname, x: a.x, y: a.y, z: a.z, isO6: aname === 'O6' });
-              }
-            });
+            r.eachAtom(a => { if (a.atomname.trim() === 'O6') dgAtomsB.push({ index: a.index, x: a.x, y: a.y, z: a.z }); });
           }
         });
 
         if (kAtomsB.length > 0 && dgAtomsB.length > 0) {
-          const nzB = kAtomsB.find(a => a.isNZ) || kAtomsB[0];
-          const tB = dgAtomsB.find(a => a.isO6) || dgAtomsB[0];
-          const distB = Math.hypot(nzB.x - tB.x, nzB.y - tB.y, nzB.z - tB.z);
+          const distB = Math.hypot(kAtomsB[0].x - dgAtomsB[0].x, kAtomsB[0].y - dgAtomsB[0].y, kAtomsB[0].z - dgAtomsB[0].z);
           appState.currentDistanceB = distB;
-          appState.dynamicPairsB.push([nzB.index, tB.index]);
+          appState.dynamicPairsB.push([kAtomsB[0].index, dgAtomsB[0].index]);
           dom.hudBDistVal.textContent = `${distB.toFixed(2)} Å`;
         }
       }
     }
 
-    // 繪製結構 A 表示法
     function applyStageARepresentations() {
       if (!appState.compA) return;
       appState.compA.removeAllRepresentations();
@@ -788,26 +516,14 @@
       appState.compA.addRepresentation('cartoon', {
         sele: 'protein and not hydrogen and not (_ZN or :ZN or [ZN] or zinc)',
         colorScheme: appState.ssSchemeIds.pymol_ss,
-        aspectRatio: 5,
-        subdiv: 12,
-        radialSegments: 20,
-        capped: true,
-        smoothSheet: true,
-        opacity: bgOpacity
+        aspectRatio: 5, subdiv: 12, opacity: bgOpacity
       });
 
       if (appState.dnaStrandSelectionsA && appState.dnaStrandSelectionsA.length > 0) {
         appState.dnaStrandSelectionsA.forEach(strandSele => {
           appState.compA.addRepresentation('cartoon', {
             sele: `${strandSele} and not protein and not (_ZN or :ZN or [ZN] or zinc)`,
-            color: '#7dd3fc',
-            radiusType: 'size',
-            radiusSize: 0.55,
-            aspectRatio: 4,
-            tension: 0.3,
-            smoothSheet: false,
-            subdiv: 12,
-            opacity: bgOpacity
+            color: '#7dd3fc', radiusType: 'size', radiusSize: 0.55, opacity: bgOpacity
           });
         });
       }
@@ -817,7 +533,6 @@
         const structure = appState.compA.structure;
         const baseColorPalette = { 'A': [0.22, 0.35, 0.95], 'T': [0.92, 0.28, 0.35], 'C': [0.95, 0.58, 0.20], 'G': [0.15, 0.80, 0.25], 'U': [0.92, 0.28, 0.35] };
         const parseBaseColor = (rname) => baseColorPalette[(rname || '').trim().toUpperCase().replace(/^D/, '').replace(/[35]$/, '')] || [0.8, 0.84, 0.89];
-        const stubRadius = 0.44;
 
         appState.dnaRungStubsA.forEach(stub => {
           const aBackbone = structure.getAtomProxy(stub.anchor);
@@ -828,8 +543,8 @@
             const dist = Math.hypot(dx, dy, dz);
             if (dist > 0.8) {
               const ux = dx / dist, uy = dy / dist, uz = dz / dist;
-              shape.addCylinder([aBackbone.x + ux * 1.2, aBackbone.y + uy * 1.2, aBackbone.z + uz * 1.2], [aBase.x, aBase.y, aBase.z], color, stubRadius);
-              shape.addSphere([aBase.x, aBase.y, aBase.z], color, stubRadius);
+              shape.addCylinder([aBackbone.x + ux * 1.2, aBackbone.y + uy * 1.2, aBackbone.z + uz * 1.2], [aBase.x, aBase.y, aBase.z], color, 0.44);
+              shape.addSphere([aBase.x, aBase.y, aBase.z], color, 0.44);
             }
           }
         });
@@ -838,69 +553,22 @@
         appState.ladderShapeCompA.addRepresentation("buffer", { opacity: bgOpacity });
       }
 
-      appState.compA.addRepresentation('spacefill', {
-        sele: '_ZN or :ZN or [ZN] or zinc',
-        color: '#94a3b8',
-        scale: 0.35,
-        opacity: bgOpacity
-      });
+      appState.compA.addRepresentation('spacefill', { sele: '_ZN or :ZN or [ZN] or zinc', color: '#94a3b8', scale: 0.35, opacity: bgOpacity });
 
-      if (appState.isFocusMode) {
+      if (appState.isFocusMode && appState.actualKResnoInPdbA) {
         const pairSele = `(${appState.actualKResnoInPdbA} and protein) or (${appState.actualDGResnoInPdbA} and not protein)`;
-        appState.compA.addRepresentation('licorice', {
-          sele: `${pairSele} and not hydrogen`,
-          colorScheme: 'element',
-          radius: 0.24,
-          multipleBond: 'off',
-          opacity: 1.0
-        });
+        appState.compA.addRepresentation('licorice', { sele: `${pairSele} and not hydrogen`, colorScheme: 'element', radius: 0.24, opacity: 1.0 });
 
         if (appState.dynamicPairsA.length > 0) {
           const d = appState.currentDistance;
-          let lineColor = '#22c55e', labelCol = '#86efac';
-          if (d > 3.5) { lineColor = '#ef4444'; labelCol = '#fca5a5'; }
-          else if (d > 3.2) { lineColor = '#eab308'; labelCol = '#fef08a'; }
-
+          let lineColor = d > 3.5 ? '#ef4444' : (d > 3.2 ? '#eab308' : '#22c55e');
           appState.compA.addRepresentation('distance', {
-            atomPair: appState.dynamicPairsA,
-            color: lineColor,
-            radius: d > 3.5 ? 0.12 : 0.08,
-            dashLength: 0.2,
-            labelUnit: 'angstrom',
-            labelColor: labelCol,
-            labelSize: 1.4,
-            labelBackground: true,
-            labelBackgroundColor: '#0b0f19',
-            labelBackgroundMargin: 0.1
+            atomPair: appState.dynamicPairsA, color: lineColor, radius: 0.08, labelUnit: 'angstrom', labelSize: 1.4, labelBackground: true, labelBackgroundColor: '#0b0f19'
           });
         }
-
-        const textShape = new NGL.Shape("focus_labels_a");
-        const st = appState.compA.structure;
-        st.eachResidue(r => {
-          if (r.resno === appState.actualKResnoInPdbA && r.isProtein()) {
-            r.eachAtom(a => {
-              if (a.atomname.trim() === 'NZ' || a.atomname.trim() === 'CA') {
-                textShape.addText([a.x, a.y + 0.9, a.z], [0.98, 0.8, 0.2], 1.3, `K${STANDARD_TARGET_K}`);
-                return false;
-              }
-            });
-          }
-          if (r.resno === appState.actualDGResnoInPdbA) {
-            r.eachAtom(a => {
-              if (a.atomname.trim() === "C1'" || a.atomname.trim() === "P") {
-                textShape.addText([a.x, a.y + 0.9, a.z], [0.22, 0.74, 0.97], 1.3, `DG${STANDARD_TARGET_DG}`);
-                return false;
-              }
-            });
-          }
-        });
-        appState.focusLabelsCompA = appState.stageA.addComponentFromObject(textShape);
-        appState.focusLabelsCompA.addRepresentation("buffer");
       }
     }
 
-    // 繪製結構 B 表示法 (【解決右邊沒虛線 + 右邊特寫透明化】)
     function applyStageBRepresentations() {
       if (!appState.compB) return;
       appState.compB.removeAllRepresentations();
@@ -914,56 +582,28 @@
         appState.focusLabelsCompB = null;
       }
 
-      // 【核心】：特寫時結構 B 背景也同步降為透明 (0.22)
       const bgOpacity = appState.isFocusMode ? 0.22 : 1.0;
 
-      // 與結構 A 完全一致的經典 PyMOL SS 配色 (Helix 紅 / Sheet 黃 / Loop 綠)
       appState.compB.addRepresentation('cartoon', {
         sele: 'protein and not hydrogen and not (_ZN or :ZN or [ZN] or zinc)',
         colorScheme: appState.ssSchemeIds.pymol_ss,
-        aspectRatio: 5,
-        subdiv: 12,
-        radialSegments: 20,
-        capped: true,
-        smoothSheet: true,
-        opacity: bgOpacity
+        aspectRatio: 5, subdiv: 12, opacity: bgOpacity
       });
 
       if (appState.dnaStrandSelectionsB && appState.dnaStrandSelectionsB.length > 0) {
         appState.dnaStrandSelectionsB.forEach(strandSele => {
           appState.compB.addRepresentation('cartoon', {
             sele: `${strandSele} and not protein and not (_ZN or :ZN or [ZN] or zinc)`,
-            color: '#7dd3fc',
-            radiusType: 'size',
-            radiusSize: 0.55,
-            aspectRatio: 4,
-            tension: 0.3,
-            smoothSheet: false,
-            subdiv: 12,
-            opacity: bgOpacity
+            color: '#7dd3fc', radiusType: 'size', radiusSize: 0.55, opacity: bgOpacity
           });
-        });
-      } else {
-        appState.compB.addRepresentation('cartoon', {
-          sele: 'nucleic and not protein and not hydrogen and not (_ZN or :ZN or [ZN] or zinc)',
-          color: '#7dd3fc',
-          radiusType: 'size',
-          radiusSize: 0.55,
-          aspectRatio: 4,
-          tension: 0.3,
-          smoothSheet: false,
-          subdiv: 12,
-          opacity: bgOpacity
         });
       }
 
-      // 結構 B 彩色 DNA 梯級
       if (appState.dnaRungStubsB && appState.dnaRungStubsB.length > 0) {
         const shape = new NGL.Shape("vmd_rungs_b");
         const structure = appState.compB.structure;
         const baseColorPalette = { 'A': [0.22, 0.35, 0.95], 'T': [0.92, 0.28, 0.35], 'C': [0.95, 0.58, 0.20], 'G': [0.15, 0.80, 0.25], 'U': [0.92, 0.28, 0.35] };
         const parseBaseColor = (rname) => baseColorPalette[(rname || '').trim().toUpperCase().replace(/^D/, '').replace(/[35]$/, '')] || [0.8, 0.84, 0.89];
-        const stubRadius = 0.44;
 
         appState.dnaRungStubsB.forEach(stub => {
           const aBackbone = structure.getAtomProxy(stub.anchor);
@@ -974,8 +614,8 @@
             const dist = Math.hypot(dx, dy, dz);
             if (dist > 0.8) {
               const ux = dx / dist, uy = dy / dist, uz = dz / dist;
-              shape.addCylinder([aBackbone.x + ux * 1.2, aBackbone.y + uy * 1.2, aBackbone.z + uz * 1.2], [aBase.x, aBase.y, aBase.z], color, stubRadius);
-              shape.addSphere([aBase.x, aBase.y, aBase.z], color, stubRadius);
+              shape.addCylinder([aBackbone.x + ux * 1.2, aBackbone.y + uy * 1.2, aBackbone.z + uz * 1.2], [aBase.x, aBase.y, aBase.z], color, 0.44);
+              shape.addSphere([aBase.x, aBase.y, aBase.z], color, 0.44);
             }
           }
         });
@@ -983,71 +623,22 @@
         appState.ladderShapeCompB.addRepresentation("buffer", { opacity: bgOpacity });
       }
 
-      appState.compB.addRepresentation('spacefill', {
-        sele: '_ZN or :ZN or [ZN] or zinc',
-        color: '#94a3b8',
-        scale: 0.35,
-        opacity: bgOpacity
-      });
+      appState.compB.addRepresentation('spacefill', { sele: '_ZN or :ZN or [ZN] or zinc', color: '#94a3b8', scale: 0.35, opacity: bgOpacity });
 
-      // 【核心】：特寫模式下結構 B 亦同步高亮 K114 與 DG82，並繪製距離虛線
       if (appState.isFocusMode && appState.actualKResnoInPdbB) {
         const pairSeleB = `(${appState.actualKResnoInPdbB} and protein) or (${appState.actualDGResnoInPdbB} and not protein)`;
-        appState.compB.addRepresentation('licorice', {
-          sele: `${pairSeleB} and not hydrogen`,
-          colorScheme: 'element',
-          radius: 0.24,
-          multipleBond: 'off',
-          opacity: 1.0
-        });
+        appState.compB.addRepresentation('licorice', { sele: `${pairSeleB} and not hydrogen`, colorScheme: 'element', radius: 0.24, opacity: 1.0 });
 
-        // 結構 B 的動態距離虛線 (【解決右邊沒有距離虛線】)
         if (appState.dynamicPairsB.length > 0) {
           const dB = appState.currentDistanceB;
-          let lineColorB = '#22c55e', labelColB = '#86efac';
-          if (dB > 3.5) { lineColorB = '#ef4444'; labelColB = '#fca5a5'; }
-          else if (dB > 3.2) { lineColorB = '#eab308'; labelColB = '#fef08a'; }
-
+          let lineColorB = dB > 3.5 ? '#ef4444' : (dB > 3.2 ? '#eab308' : '#22c55e');
           appState.compB.addRepresentation('distance', {
-            atomPair: appState.dynamicPairsB,
-            color: lineColorB,
-            radius: dB > 3.5 ? 0.12 : 0.08,
-            dashLength: 0.2,
-            labelUnit: 'angstrom',
-            labelColor: labelColB,
-            labelSize: 1.4,
-            labelBackground: true,
-            labelBackgroundColor: '#0b0f19',
-            labelBackgroundMargin: 0.1
+            atomPair: appState.dynamicPairsB, color: lineColorB, radius: 0.08, labelUnit: 'angstrom', labelSize: 1.4, labelBackground: true, labelBackgroundColor: '#0b0f19'
           });
         }
-
-        const textShapeB = new NGL.Shape("focus_labels_b");
-        const stB = appState.compB.structure;
-        stB.eachResidue(r => {
-          if (r.resno === appState.actualKResnoInPdbB && r.isProtein()) {
-            r.eachAtom(a => {
-              if (a.atomname.trim() === 'NZ' || a.atomname.trim() === 'CA') {
-                textShapeB.addText([a.x, a.y + 0.9, a.z], [0.98, 0.8, 0.2], 1.3, `K${STANDARD_TARGET_K}`);
-                return false;
-              }
-            });
-          }
-          if (r.resno === appState.actualDGResnoInPdbB) {
-            r.eachAtom(a => {
-              if (a.atomname.trim() === "C1'" || a.atomname.trim() === "P") {
-                textShapeB.addText([a.x, a.y + 0.9, a.z], [0.22, 0.74, 0.97], 1.3, `DG${STANDARD_TARGET_DG}`);
-                return false;
-              }
-            });
-          }
-        });
-        appState.focusLabelsCompB = appState.stageB.addComponentFromObject(textShapeB);
-        appState.focusLabelsCompB.addRepresentation("buffer");
       }
     }
 
-    // 【核心相機完全複製】：保證 Stage B 鏡頭與 Stage A 100% 相同視角與縮放
     function cloneCameraFromAToB() {
       if (!appState.stageA || !appState.stageB) return;
       const orient = appState.stageA.viewerControls.getOrientation();
@@ -1062,50 +653,13 @@
       appState.stageA.viewer.requestRender();
     }
 
-    // 【核心修復】：對齊函式 (預設保持 VMD 原汁原味對齊，絕不亂轉座標！)
-    function alignStructureBToA() {
-      if (!appState.compA || !appState.compB) return;
-      const mode = appState.alignMode;
-
-      if (mode === 'keep_vmd') {
-        // 模式 1：保持原始座標 (VMD 已精準對齊，不進行破壞性重對齊)
-        // 僅複製鏡頭視角，保證鋅離子、蛋白質、DNA 都在原始 VMD 座標精確吻合！
-        cloneCameraFromAToB();
-        return;
-      }
-
-      const sA = appState.compA.structure;
-      const sB = appState.compB.structure;
-
-      try {
-        if (mode === 'protein_ca') {
-          // 模式 2：僅以蛋白質 C-alpha 骨架做 Needleman-Wunsch 序列對齊 (鋅離子幾何連帶精確重疊)
-          NGL.superpose(sA, sB, true, 'protein and .CA', 'protein and .CA');
-        } else if (mode === 'dna_heavy') {
-          // 模式 3：以 DNA 重原子 (含鹼基環) 對齊
-          NGL.superpose(sA, sB, true, 'nucleic and not hydrogen', 'nucleic and not hydrogen');
-        }
-        appState.compB.updateRepresentations({ position: true });
-      } catch (err) {
-        console.warn('Superpose 警告:', err);
-      }
-
-      cloneCameraFromAToB();
-    }
-
-    // 換幀函式
     function setFrame(targetFrame) {
       const maxF = appState.totalFramesA - 1;
       let f = Math.max(0, Math.min(targetFrame, maxF));
       appState.currentFrameA = f;
 
-      if (appState.trajectoryA) {
-        appState.trajectoryA.setFrame(f);
-      }
-      if (appState.trajectoryB) {
-        const frameB = f % (appState.trajectoryB.frameCount || 1);
-        appState.trajectoryB.setFrame(frameB);
-      }
+      if (appState.trajectoryA) appState.trajectoryA.setFrame(f);
+      if (appState.trajectoryB) appState.trajectoryB.setFrame(f % (appState.trajectoryB.frameCount || 1));
 
       const stA = appState.compA ? appState.compA.structure : null;
       const stB = appState.compB ? appState.compB.structure : null;
@@ -1136,19 +690,13 @@
           return;
         }
       }
-
       setFrame(next);
     }
 
-    // 穩固暫停與播放
     function pausePlayback() {
       appState.isPlaying = false;
-      if (appState.trajectoryA && appState.trajectoryA.player) {
-        appState.trajectoryA.player.pause();
-      }
-      if (appState.trajectoryB && appState.trajectoryB.player) {
-        appState.trajectoryB.player.pause();
-      }
+      if (appState.trajectoryA && appState.trajectoryA.player) appState.trajectoryA.player.pause();
+      if (appState.trajectoryB && appState.trajectoryB.player) appState.trajectoryB.player.pause();
       updatePlayIcon(false);
     }
 
@@ -1163,24 +711,11 @@
       const timeoutMs = Math.round(1000 / appState.fps);
 
       if (appState.trajectoryA && appState.trajectoryA.player) {
-        appState.trajectoryA.player.setParameters({
-          step: 1,
-          mode: appState.loopMode,
-          interpolateType: type,
-          interpolateStep: step,
-          timeout: timeoutMs
-        });
+        appState.trajectoryA.player.setParameters({ step: 1, mode: appState.loopMode, interpolateType: type, interpolateStep: step, timeout: timeoutMs });
         appState.trajectoryA.player.play();
       }
-
       if (appState.trajectoryB && appState.trajectoryB.player) {
-        appState.trajectoryB.player.setParameters({
-          step: 1,
-          mode: appState.loopMode,
-          interpolateType: type,
-          interpolateStep: step,
-          timeout: timeoutMs
-        });
+        appState.trajectoryB.player.setParameters({ step: 1, mode: appState.loopMode, interpolateType: type, interpolateStep: step, timeout: timeoutMs });
         appState.trajectoryB.player.play();
       }
     }
@@ -1197,7 +732,6 @@
       lucide.createIcons();
     }
 
-    // 【核心修復】：兩側同時特寫、兩側相機統一焦點置中
     function toggleFocus() {
       if (!appState.compA) return;
       appState.isFocusMode = !appState.isFocusMode;
@@ -1212,19 +746,13 @@
         applyStageARepresentations();
         if (appState.compB) applyStageBRepresentations();
         
-        // 核心對焦選擇式
         const focusSeleA = `(${appState.actualKResnoInPdbA} and protein) or (${appState.actualDGResnoInPdbA} and not protein)`;
-        
-        // Stage A 放大對焦
         appState.stageA.autoView(focusSeleA, 500);
 
-        // 動畫期間持續將 Stage A 的相機鏡頭鏡像到 Stage B，確保視角 100% 相同且同時置中！
         const startTime = performance.now();
         function animateSync() {
           cloneCameraFromAToB();
-          if (performance.now() - startTime < 550) {
-            requestAnimationFrame(animateSync);
-          }
+          if (performance.now() - startTime < 550) requestAnimationFrame(animateSync);
         }
         requestAnimationFrame(animateSync);
       } else {
@@ -1237,9 +765,7 @@
         const startTime = performance.now();
         function animateSyncReset() {
           cloneCameraFromAToB();
-          if (performance.now() - startTime < 550) {
-            requestAnimationFrame(animateSyncReset);
-          }
+          if (performance.now() - startTime < 550) requestAnimationFrame(animateSyncReset);
         }
         requestAnimationFrame(animateSyncReset);
       }
@@ -1259,7 +785,7 @@
 
         const comp = await appState.stageA.loadFile(url, { defaultRepresentation: false, asTrajectory: true });
         appState.compA = comp;
-        dom.badgeTitleA.textContent = `視窗 A: ${url.replace(/\\.pdb(\\.gz)?$/i, '')}`;
+        dom.badgeTitleA.textContent = `視窗 A: ${url.replace(/\.pdb(\.gz)?$/i, '')}`;
 
         comp.structure.eachResidue(r => {
           const rn = (r.resname || '').trim().toUpperCase();
@@ -1268,30 +794,24 @@
         });
 
         applySecondaryStructure(comp);
-        analyzeStructureForStageA(comp.structure);
+        parseStructureAnalysis(comp.structure, true);
         updateDynamicInteractionsAndHUD(comp.structure, appState.compB ? appState.compB.structure : null);
         applyStageARepresentations();
         
-        // 初始置中
         comp.autoView(500);
 
         const trajComp = comp.addTrajectory();
-        const trajectory = trajComp.trajectory;
         appState.trajCompA = trajComp;
-        appState.trajectoryA = trajectory;
+        appState.trajectoryA = trajComp.trajectory;
 
-        // 換幀監聽
-        trajectory.signals.frameChanged.add(function (frameIndex) {
+        appState.trajectoryA.signals.frameChanged.add(function (frameIndex) {
           appState.currentFrameA = frameIndex;
           dom.slider.value = frameIndex;
           dom.sliderCurr.textContent = frameIndex;
-
           const stB = appState.compB ? appState.compB.structure : null;
           updateDynamicInteractionsAndHUD(comp.structure, stB);
           applyStageARepresentations();
-          if (appState.compB && appState.trajectoryB) {
-            applyStageBRepresentations();
-          }
+          if (appState.compB && appState.trajectoryB) applyStageBRepresentations();
         });
 
         const handleCount = (count) => {
@@ -1310,12 +830,11 @@
           }
         };
 
-        trajectory.signals.countChanged.add(handleCount);
-        handleCount(trajectory.frameCount || 1);
+        appState.trajectoryA.signals.countChanged.add(handleCount);
+        handleCount(appState.trajectoryA.frameCount || 1);
 
       } catch (err) {
         console.error('結構 A 載入失敗:', err);
-        alert('檔案 A 載入失敗。');
       } finally {
         hideLoading();
       }
@@ -1334,7 +853,7 @@
 
         const comp = await appState.stageB.loadFile(url, { defaultRepresentation: false, asTrajectory: true });
         appState.compB = comp;
-        dom.badgeTitleB.textContent = `視窗 B: ${url.replace(/\\.pdb(\\.gz)?$/i, '')}`;
+        dom.badgeTitleB.textContent = `視窗 B: ${url.replace(/\.pdb(\.gz)?$/i, '')}`;
 
         comp.structure.eachResidue(r => {
           const rn = (r.resname || '').trim().toUpperCase();
@@ -1343,9 +862,7 @@
         });
 
         applySecondaryStructure(comp);
-        analyzeStructureForStageB(comp.structure);
-        
-        // 雙側均測距與產生虛線
+        parseStructureAnalysis(comp.structure, false);
         updateDynamicInteractionsAndHUD(appState.compA ? appState.compA.structure : null, comp.structure);
         applyStageBRepresentations();
 
@@ -1355,38 +872,29 @@
           appState.trajectoryB = trajCompB.trajectory;
         } catch (e) {}
 
-        // 保持座標對齊並克隆鏡頭視角
-        alignStructureBToA();
-
+        cloneCameraFromAToB();
       } catch (err) {
         console.error('結構 B 載入失敗:', err);
-        alert('對比檔案 B 載入失敗。');
       } finally {
         hideLoading();
       }
     }
 
-    // 左右對比開關切換 (【完美解決視窗 A 的即時置中】)
     function enableSplitMode() {
       appState.isSplitMode = true;
       dom.splitStatus.textContent = 'ON';
       dom.splitStatus.className = 'font-bold text-purple-400';
       dom.btnToggleSync.classList.remove('hidden');
-      dom.alignBox.classList.remove('hidden');
       dom.fileBoxB.classList.remove('hidden');
 
-      // 視窗寬度切為 50% / 50%
       dom.viewportA.classList.remove('w-full');
       dom.viewportA.classList.add('w-1/2');
-
       dom.viewportB.classList.remove('hidden');
       dom.viewportB.classList.add('w-1/2');
 
-      // 立即重新計算 WebGL 緩衝區尺寸
       appState.stageA.handleResize();
       appState.stageB.handleResize();
 
-      // 強制左視窗 A 重新居中於其 50% 寬度的正中心！
       if (appState.compA) {
         if (appState.isFocusMode) {
           const focusSeleA = `(${appState.actualKResnoInPdbA} and protein) or (${appState.actualDGResnoInPdbA} and not protein)`;
@@ -1403,22 +911,18 @@
       }
     }
 
-    // 取消左右雙分割時：100% 精準回到全螢幕幾何正中心
     function disableSplitMode() {
       appState.isSplitMode = false;
       dom.splitStatus.textContent = 'OFF';
       dom.splitStatus.className = 'font-bold text-slate-400';
       dom.btnToggleSync.classList.add('hidden');
-      dom.alignBox.classList.add('hidden');
       dom.fileBoxB.classList.add('hidden');
 
       dom.viewportB.classList.add('hidden');
       dom.viewportB.classList.remove('w-1/2');
-
       dom.viewportA.classList.remove('w-1/2');
       dom.viewportA.classList.add('w-full');
 
-      // 立即重算視口大小，並重置相機中心點
       appState.stageA.handleResize();
       if (appState.compA) {
         if (appState.isFocusMode) {
@@ -1428,13 +932,9 @@
           appState.stageA.autoView(0);
         }
       }
-
-      requestAnimationFrame(() => {
-        appState.stageA.handleResize();
-      });
+      requestAnimationFrame(() => appState.stageA.handleResize());
     }
 
-    // 視角雙向同步事件綁定 (【無損鏡頭鏡像】)
     function initCameraSync() {
       appState.stageA.viewerControls.signals.changed.add(() => {
         if (!appState.isSplitMode || !appState.syncCamera || appState.isSyncingCam || !appState.stageB) return;
@@ -1456,49 +956,34 @@
       const specifiedFile = urlParams.get('file') || urlParams.get('pdb');
       const specifiedFileB = urlParams.get('fileB') || urlParams.get('pdbB');
 
-      const hostname = window.location.hostname;
-      const pathname = window.location.pathname.replace(/^\\/|\\/$/g, '');
-      let found = [];
-
-      if (hostname.endsWith('github.io') && pathname) {
-        const owner = hostname.split('.')[0];
-        const repo = pathname.split('/')[0];
-        try {
-          const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents`);
-          if (res.ok) {
-            const data = await res.json();
-            found = data
-              .filter(item => item.type === 'file' && (item.name.endsWith('.pdb') || item.name.endsWith('.pdb.gz')))
-              .map(item => item.name);
-          }
-        } catch (e) {}
-      }
+      // 預設檔案
+      const fileList = [
+        'WT_stable_aligned.pdb',
+        'aa_breathing_snippet_aligned.pdb'
+      ];
 
       dom.fileSelectorA.innerHTML = '';
       dom.fileSelectorB.innerHTML = '<option value="" disabled selected>選擇對比檔案 B...</option>';
 
-      if (found.length > 0) {
-        found.forEach(name => {
-          const optA = document.createElement('option');
-          optA.value = name; optA.textContent = name;
-          dom.fileSelectorA.appendChild(optA);
+      fileList.forEach(name => {
+        const optA = document.createElement('option');
+        optA.value = name; optA.textContent = name;
+        dom.fileSelectorA.appendChild(optA);
 
-          const optB = document.createElement('option');
-          optB.value = name; optB.textContent = name;
-          dom.fileSelectorB.appendChild(optB);
-        });
+        const optB = document.createElement('option');
+        optB.value = name; optB.textContent = name;
+        dom.fileSelectorB.appendChild(optB);
+      });
 
-        loadPdbFileA(specifiedFile || found[0]);
-        if (specifiedFileB) {
-          dom.fileSelectorB.value = specifiedFileB;
-          enableSplitMode();
-        } else if (found.length > 1) {
-          dom.fileSelectorB.value = found[1];
-        }
-      } else {
-        const fallback = specifiedFile || 'model.pdb';
-        dom.fileSelectorA.innerHTML = `<option value="${fallback}">${fallback}</option>`;
-        loadPdbFileA(fallback);
+      const initialA = specifiedFile || fileList[0];
+      dom.fileSelectorA.value = initialA;
+      loadPdbFileA(initialA);
+
+      const initialB = specifiedFileB || fileList[1];
+      dom.fileSelectorB.value = initialB;
+
+      if (specifiedFileB) {
+        enableSplitMode();
       }
     }
 
@@ -1523,27 +1008,13 @@
         else enableSplitMode();
       });
 
-      // 視角同步開關 (切為 ON 時額外執行一次嚴格對齊)
       dom.btnToggleSync.addEventListener('click', () => {
         appState.syncCamera = !appState.syncCamera;
         dom.syncStatus.textContent = appState.syncCamera ? 'ON' : 'OFF';
         dom.syncStatus.className = appState.syncCamera ? 'font-bold text-emerald-400' : 'font-bold text-slate-500';
-
-        if (appState.syncCamera) {
-          cloneCameraFromAToB();
-        }
+        if (appState.syncCamera) cloneCameraFromAToB();
       });
 
-      // 對齊模式選單切換
-      dom.alignModeSelect.addEventListener('change', (e) => {
-        appState.alignMode = e.target.value;
-        alignStructureBToA();
-      });
-      dom.btnRealign.addEventListener('click', () => {
-        alignStructureBToA();
-      });
-
-      // 平滑內插開關
       dom.btnToggleInterpolate.addEventListener('click', () => {
         appState.interpolateOn = !appState.interpolateOn;
         dom.interpolateStatus.textContent = appState.interpolateOn ? 'ON' : 'OFF';
@@ -1603,7 +1074,6 @@
 
     window.addEventListener('load', () => {
       registerCustomColorSchemes();
-      installArrowPatch();
 
       const stageConfig = {
         backgroundColor: '#0b0f19',
