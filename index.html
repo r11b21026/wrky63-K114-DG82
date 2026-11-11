@@ -43,7 +43,7 @@
 </head>
 <body class="w-screen h-screen relative bg-[#0b0f19] flex flex-col">
 
-  <!-- 3D 渲染視窗容器 (左右分割排版，無 CSS 延遲以確保還原時即時居中) -->
+  <!-- 3D 渲染視窗容器 (左右分割排版，無 CSS transition 避免 resize 時中心偏移) -->
   <div id="viewport-container" class="w-full h-full relative flex flex-row overflow-hidden">
     <!-- 左側視窗 (結構 A) -->
     <div id="viewport-a" class="w-full h-full relative cursor-grab active:cursor-grabbing">
@@ -96,8 +96,8 @@
         <span id="sync-status" class="font-bold text-emerald-400">ON</span>
       </button>
 
-      <!-- 平滑內插補幀開關 (Spline 內插) -->
-      <button id="btn-toggle-interpolate" class="bg-slate-900/90 backdrop-blur-md border border-cyan-500/50 hover:bg-slate-800 text-cyan-300 px-2.5 py-1.5 rounded-xl text-xs font-medium flex items-center space-x-1.5 transition shadow-lg" title="開啟 Spline 內插補幀，讓動作極致平滑">
+      <!-- 平滑內插補幀開關 -->
+      <button id="btn-toggle-interpolate" class="bg-slate-900/90 backdrop-blur-md border border-cyan-500/50 hover:bg-slate-800 text-cyan-300 px-2.5 py-1.5 rounded-xl text-xs font-medium flex items-center space-x-1.5 transition shadow-lg" title="開啟 Spline 內插補幀，讓 60 幀動作極致平滑">
         <i data-lucide="activity" class="w-3.5 h-3.5 text-cyan-400"></i>
         <span class="hidden sm:inline">平滑:</span>
         <span id="interpolate-status" class="font-bold text-emerald-400">ON</span>
@@ -181,7 +181,7 @@
           <span id="loop-label">循環</span>
         </button>
 
-        <!-- 播放主按鍵 (暫停絕對正常) -->
+        <!-- 播放主按鍵 -->
         <div class="flex items-center space-x-1">
           <button id="btn-first-frame" class="p-1.5 rounded-lg hover:bg-slate-800 text-slate-300 hover:text-white transition">
             <i data-lucide="skip-back" class="w-4 h-4"></i>
@@ -221,7 +221,6 @@
       'THR': 'T', 'TRP': 'W', 'TYR': 'Y', 'VAL': 'V'
     };
 
-    // 核心基準編號：以 WRKYGQK 中的 W108 為基準
     const STANDARD_ANCHOR_W = 108;
     const STANDARD_TARGET_K = 114;
     const STANDARD_TARGET_DG = 82;
@@ -237,7 +236,7 @@
       totalFramesA: 1,
       currentFrameA: 0,
 
-      // 結構 B (不變顏色，維持同款原版真實配色)
+      // 結構 B
       compB: null,
       trajCompB: null,
       trajectoryB: null,
@@ -255,11 +254,11 @@
       direction: 1,
       timerId: null,
 
-      // 內插設定 (平滑補幀)
+      // 內插設定
       interpolateOn: true,
       interpolateStep: 6,
 
-      isFocusMode: true,
+      isFocusMode: false, // 預設居中全覽，避免載入時畫面被裁切
 
       actualKResnoInPdbA: null,
       actualDGResnoInPdbA: null,
@@ -269,7 +268,6 @@
 
       actualKResnoInPdbB: null,
       actualDGResnoInPdbB: null,
-      dynamicPairsB: [],
       focusLabelsCompB: null,
 
       dnaStrandSelectionsA: [],
@@ -495,6 +493,7 @@
       } catch (e) {}
     }
 
+    // 解析 DNA 梯級與 W108 基準
     function analyzeStructureForStageA(structure) {
       const nucleicResList = [];
       const protResList = [];
@@ -610,7 +609,6 @@
         }
       });
 
-      // 序列基準 W108 比對 (結構 B 亦套用以精準特寫)
       const seqStr = protResList.map(x => x.code).join('');
       const motifIdx = seqStr.indexOf('WRKYGQK');
       let deltaOffset = 0;
@@ -841,7 +839,7 @@
       }
     }
 
-    // 繪製結構 B 表示法 (【核心修改點 1 & 2】：與 A 保持一模一樣的配色，且特寫時同步透明化並呈現特寫殘基)
+    // 繪製結構 B 表示法 (特寫時雙側同時透明化，且呈現特寫殘基)
     function applyStageBRepresentations() {
       if (!appState.compB) return;
       appState.compB.removeAllRepresentations();
@@ -855,10 +853,10 @@
         appState.focusLabelsCompB = null;
       }
 
-      // 【核心】：特寫時結構 B 背景也同步降為透明 (0.22)
+      // 特寫模式下結構 B 亦同步降為半透明 (0.22)
       const bgOpacity = appState.isFocusMode ? 0.22 : 1.0;
 
-      // 與結構 A 完全一致的經典 PyMOL SS 配色 (Helix 紅 / Sheet 黃 / Loop 綠)
+      // 保持與 A 相同的 PyMOL SS 經典配色
       appState.compB.addRepresentation('cartoon', {
         sele: 'protein and not hydrogen and not (_ZN or :ZN or [ZN] or zinc)',
         colorScheme: appState.ssSchemeIds.pymol_ss,
@@ -898,7 +896,6 @@
         });
       }
 
-      // 結構 B 彩色 DNA 梯級
       if (appState.dnaRungStubsB && appState.dnaRungStubsB.length > 0) {
         const shape = new NGL.Shape("vmd_rungs_b");
         const structure = appState.compB.structure;
@@ -931,7 +928,7 @@
         opacity: bgOpacity
       });
 
-      // 【核心】：特寫模式下結構 B 亦同步高亮 K114 與 DG82
+      // 特寫模式下結構 B 亦同步高亮 K114 與 DG82
       if (appState.isFocusMode && appState.actualKResnoInPdbB) {
         const pairSeleB = `(${appState.actualKResnoInPdbB} and protein) or (${appState.actualDGResnoInPdbB} and not protein)`;
         appState.compB.addRepresentation('licorice', {
@@ -967,30 +964,225 @@
       }
     }
 
-    // 【核心修改點 1】：包含 DNA 鹼基在內的嚴謹結構對齊 (Superposition including Base Rings)
-    function alignStructureBToA() {
-      if (!appState.compA || !appState.compB) return;
-      try {
-        // 在核酸中，'backbone' 僅包含糖磷酸骨架，而 'nucleic and not hydrogen' 包含所有鹼基環原子！
-        // 結合蛋白質骨架與 DNA 包含鹼基在內的所有重原子進行嚴格對齊：
-        NGL.superpose(appState.compA.structure, appState.compB.structure, true, '(protein and backbone) or (nucleic and not hydrogen)');
-        appState.compB.updateRepresentations({ position: true });
-      } catch (e) {
-        try {
-          // 若序列長度略有差異，以蛋白質核心 CA 與 DNA 重原子對齊
-          NGL.superpose(appState.compA.structure, appState.compB.structure, true, '(protein and .CA) or (nucleic and not hydrogen)');
-          appState.compB.updateRepresentations({ position: true });
-        } catch (err) {
-          try {
-            NGL.superpose(appState.compA.structure, appState.compB.structure, true, 'protein and .CA');
-            appState.compB.updateRepresentations({ position: true });
-          } catch (err2) {
-            console.warn('Superpose 對齊警告:', err2);
-          }
+    // 嚴格三維 Kabsch 演算法 (計算 4x4 旋轉平移變換矩陣)
+    function computeKabschTransform(ptsP, ptsQ) {
+      const n = ptsP.length;
+      if (n < 3) return null;
+
+      let cp = [0, 0, 0], cq = [0, 0, 0];
+      for (let i = 0; i < n; i++) {
+        cp[0] += ptsP[i][0]; cp[1] += ptsP[i][1]; cp[2] += ptsP[i][2];
+        cq[0] += ptsQ[i][0]; cq[1] += ptsQ[i][1]; cq[2] += ptsQ[i][2];
+      }
+      cp = [cp[0] / n, cp[1] / n, cp[2] / n];
+      cq = [cq[0] / n, cq[1] / n, cq[2] / n];
+
+      const H = [ [0,0,0], [0,0,0], [0,0,0] ];
+      for (let i = 0; i < n; i++) {
+        const qx = ptsQ[i][0] - cq[0], qy = ptsQ[i][1] - cq[1], qz = ptsQ[i][2] - cq[2];
+        const px = ptsP[i][0] - cp[0], py = ptsP[i][1] - cp[1], pz = ptsP[i][2] - cp[2];
+        H[0][0] += qx * px; H[0][1] += qx * py; H[0][2] += qx * pz;
+        H[1][0] += qy * px; H[1][1] += qy * py; H[1][2] += qy * pz;
+        H[2][0] += qz * px; H[2][1] += qz * py; H[2][2] += qz * pz;
+      }
+
+      const AtA = [ [0,0,0], [0,0,0], [0,0,0] ];
+      for (let i = 0; i < 3; i++) {
+        for (let j = 0; j < 3; j++) {
+          for (let k = 0; k < 3; k++) AtA[i][j] += H[k][i] * H[k][j];
         }
       }
 
-      // 同步兩邊相機視角
+      const V = [ [1,0,0], [0,1,0], [0,0,1] ];
+      const A = [ [AtA[0][0], AtA[0][1], AtA[0][2]], [AtA[1][0], AtA[1][1], AtA[1][2]], [AtA[2][0], AtA[2][1], AtA[2][2]] ];
+
+      for (let iter = 0; iter < 50; iter++) {
+        let p = 0, q = 1, maxVal = Math.abs(A[0][1]);
+        if (Math.abs(A[0][2]) > maxVal) { p = 0; q = 2; maxVal = Math.abs(A[0][2]); }
+        if (Math.abs(A[1][2]) > maxVal) { p = 1; q = 2; maxVal = Math.abs(A[1][2]); }
+        if (maxVal < 1e-9) break;
+
+        const app = A[p][p], aqq = A[q][q], apq = A[p][q];
+        const phi = 0.5 * Math.atan2(2 * apq, aqq - app);
+        const c = Math.cos(phi), s = Math.sin(phi);
+
+        const J = [ [1,0,0], [0,1,0], [0,0,1] ];
+        J[p][p] = c; J[q][q] = c; J[p][q] = s; J[q][p] = -s;
+
+        const tempA = [ [0,0,0], [0,0,0], [0,0,0] ];
+        for (let i = 0; i < 3; i++) {
+          for (let j = 0; j < 3; j++) {
+            for (let k = 0; k < 3; k++) tempA[i][j] += J[k][i] * A[k][j];
+          }
+        }
+        for (let i = 0; i < 3; i++) {
+          for (let j = 0; j < 3; j++) {
+            let sum = 0;
+            for (let k = 0; k < 3; k++) sum += tempA[i][k] * J[k][j];
+            A[i][j] = sum;
+          }
+        }
+
+        const tempV = [ [0,0,0], [0,0,0], [0,0,0] ];
+        for (let i = 0; i < 3; i++) {
+          for (let j = 0; j < 3; j++) {
+            for (let k = 0; k < 3; k++) tempV[i][j] += V[i][k] * J[k][j];
+          }
+        }
+        for (let i = 0; i < 3; i++) {
+          for (let j = 0; j < 3; j++) V[i][j] = tempV[i][j];
+        }
+      }
+
+      const eig = [A[0][0], A[1][1], A[2][2]];
+      const order = [0, 1, 2].sort((a, b) => eig[b] - eig[a]);
+      const S = order.map(i => Math.sqrt(Math.max(0, eig[i])));
+      const V_sorted = [
+        [V[0][order[0]], V[0][order[1]], V[0][order[2]]],
+        [V[1][order[0]], V[1][order[1]], V[1][order[2]]],
+        [V[2][order[0]], V[2][order[1]], V[2][order[2]]]
+      ];
+
+      const U = [ [0,0,0], [0,0,0], [0,0,0] ];
+      for (let col = 0; col < 3; col++) {
+        const s_inv = S[col] > 1e-6 ? 1.0 / S[col] : 0.0;
+        for (let row = 0; row < 3; row++) {
+          let sum = 0;
+          for (let k = 0; k < 3; k++) sum += H[row][k] * V_sorted[k][col];
+          U[row][col] = sum * s_inv;
+        }
+      }
+
+      const R_cand = [ [0,0,0], [0,0,0], [0,0,0] ];
+      for (let i = 0; i < 3; i++) {
+        for (let j = 0; j < 3; j++) {
+          for (let k = 0; k < 3; k++) R_cand[i][j] += U[i][k] * V_sorted[j][k];
+        }
+      }
+      const detUV = R_cand[0][0] * (R_cand[1][1]*R_cand[2][2] - R_cand[1][2]*R_cand[2][1])
+                  - R_cand[0][1] * (R_cand[1][0]*R_cand[2][2] - R_cand[1][2]*R_cand[2][0])
+                  + R_cand[0][2] * (R_cand[1][0]*R_cand[2][1] - R_cand[1][1]*R_cand[2][0]);
+
+      const E = [ [1,0,0], [0,1,0], [0,0, (detUV < 0 ? -1 : 1)] ];
+      const R = [ [0,0,0], [0,0,0], [0,0,0] ];
+      for (let i = 0; i < 3; i++) {
+        for (let j = 0; j < 3; j++) {
+          for (let k = 0; k < 3; k++) R[i][j] += (U[i][k] * E[k][k]) * V_sorted[j][k];
+        }
+      }
+
+      const T = [
+        cp[0] - (R[0][0]*cq[0] + R[0][1]*cq[1] + R[0][2]*cq[2]),
+        cp[1] - (R[1][0]*cq[0] + R[1][1]*cq[1] + R[1][2]*cq[2]),
+        cp[2] - (R[2][0]*cq[0] + R[2][1]*cq[1] + R[2][2]*cq[2])
+      ];
+
+      return [
+        R[0][0], R[1][0], R[2][0], 0,
+        R[0][1], R[1][1], R[2][1], 0,
+        R[0][2], R[1][2], R[2][2], 0,
+        T[0],    T[1],    T[2],    1
+      ];
+    }
+
+    // 採集對應點 (含蛋白質 CA、鋅離子與 DNA 鹼基中心，徹底解決顛倒鏡射問題)
+    function alignStructureBToA() {
+      if (!appState.compA || !appState.compB) return;
+      const sA = appState.compA.structure;
+      const sB = appState.compB.structure;
+
+      const ptsA = [];
+      const ptsB = [];
+
+      // 1. 配對蛋白質 CA 原子 (以 W108 為標準錨定)
+      const caMapA = new Map();
+      const caMapB = new Map();
+
+      sA.eachResidue(r => {
+        if (r.isProtein()) {
+          const stdNo = r.resno + (STANDARD_TARGET_K - appState.actualKResnoInPdbA);
+          r.eachAtom(a => {
+            if (a.atomname.trim() === 'CA') caMapA.set(stdNo, [a.x, a.y, a.z]);
+          });
+        }
+      });
+
+      sB.eachResidue(r => {
+        if (r.isProtein()) {
+          const stdNo = r.resno + (STANDARD_TARGET_K - appState.actualKResnoInPdbB);
+          r.eachAtom(a => {
+            if (a.atomname.trim() === 'CA') caMapB.set(stdNo, [a.x, a.y, a.z]);
+          });
+        }
+      });
+
+      caMapA.forEach((posA, stdNo) => {
+        if (caMapB.has(stdNo)) {
+          ptsA.push(posA);
+          ptsB.push(caMapB.get(stdNo));
+        }
+      });
+
+      // 2. 配對鋅離子 (給予高權重以保證鋅指方向 100% 正確)
+      let znA = null, znB = null;
+      sA.eachAtom(a => {
+        const rn = (a.resname || '').trim().toUpperCase();
+        if (rn === 'ZN' || rn === 'ZN2' || rn === 'ZINC') znA = [a.x, a.y, a.z];
+      });
+      sB.eachAtom(a => {
+        const rn = (a.resname || '').trim().toUpperCase();
+        if (rn === 'ZN' || rn === 'ZN2' || rn === 'ZINC') znB = [a.x, a.y, a.z];
+      });
+      if (znA && znB) {
+        for (let w = 0; w < 5; w++) {
+          ptsA.push(znA);
+          ptsB.push(znB);
+        }
+      }
+
+      // 3. 配對 DNA 鹼基中心 (保證核酸與鹼基配對方向正確)
+      const dnaBasesA = [];
+      const dnaBasesB = [];
+      sA.eachResidue(r => {
+        if (r.isNucleic() || /^(D[ATCG])/.test(r.resname)) {
+          let cx = 0, cy = 0, cz = 0, count = 0;
+          r.eachAtom(a => {
+            const an = a.atomname.trim();
+            if (an === 'N1' || an === 'C2' || an === 'N3' || an === 'C4' || an === 'C5' || an === 'C6' || an === 'N7' || an === 'C8' || an === 'N9') {
+              cx += a.x; cy += a.y; cz += a.z; count++;
+            }
+          });
+          if (count > 0) dnaBasesA.push([cx / count, cy / count, cz / count]);
+        }
+      });
+      sB.eachResidue(r => {
+        if (r.isNucleic() || /^(D[ATCG])/.test(r.resname)) {
+          let cx = 0, cy = 0, cz = 0, count = 0;
+          r.eachAtom(a => {
+            const an = a.atomname.trim();
+            if (an === 'N1' || an === 'C2' || an === 'N3' || an === 'C4' || an === 'C5' || an === 'C6' || an === 'N7' || an === 'C8' || an === 'N9') {
+              cx += a.x; cy += a.y; cz += a.z; count++;
+            }
+          });
+          if (count > 0) dnaBasesB.push([cx / count, cy / count, cz / count]);
+        }
+      });
+
+      const minBases = Math.min(dnaBasesA.length, dnaBasesB.length);
+      for (let i = 0; i < minBases; i++) {
+        ptsA.push(dnaBasesA[i]);
+        ptsB.push(dnaBasesB[i]);
+      }
+
+      // 4. 計算 4x4 剛體變換並套用於 WebGL Object3D
+      if (ptsA.length >= 6) {
+        const mat4 = computeKabschTransform(ptsA, ptsB);
+        if (mat4) {
+          appState.compB.setTransform(mat4);
+        }
+      }
+
+      // 5. 複製相機視角矩陣
       if (appState.stageA && appState.stageB) {
         const orient = appState.stageA.viewerControls.getOrientation();
         appState.stageB.viewerControls.orient(orient);
@@ -1007,7 +1199,7 @@
         appState.trajectoryA.setFrame(f);
       }
       if (appState.trajectoryB) {
-        const frameB = f % (appState.trajectoryB.frameCount || 1);
+        const frameB = f % (appState.totalFramesB || 1);
         appState.trajectoryB.setFrame(frameB);
       }
 
@@ -1023,29 +1215,7 @@
       dom.sliderCurr.textContent = f;
     }
 
-    function stepFrame(step) {
-      if (appState.totalFramesA <= 1) return;
-      let next = appState.currentFrameA + step;
-      const maxF = appState.totalFramesA - 1;
-
-      if (appState.loopMode === 'loop') {
-        if (next > maxF) next = 0;
-        if (next < 0) next = maxF;
-      } else if (appState.loopMode === 'rock') {
-        if (next > maxF) { appState.direction = -1; next = maxF - 1; }
-        else if (next < 0) { appState.direction = 1; next = 1; }
-      } else if (appState.loopMode === 'once') {
-        if (next > maxF || next < 0) {
-          pausePlayback();
-          setFrame(next > maxF ? maxF : 0);
-          return;
-        }
-      }
-
-      setFrame(next);
-    }
-
-    // 【核心修改點 3】：結合平滑內插與穩固暫停的播放器
+    // 暫停與播放 (兩邊同時驅動，平滑補幀)
     function pausePlayback() {
       appState.isPlaying = false;
       if (appState.trajectoryA && appState.trajectoryA.player) {
@@ -1067,7 +1237,6 @@
       const step = appState.interpolateOn ? appState.interpolateStep : 1;
       const timeoutMs = Math.round(1000 / appState.fps);
 
-      // 調用原生 TrajectoryPlayer 執行平滑樣條內插 (Spline Interpolation)
       if (appState.trajectoryA && appState.trajectoryA.player) {
         appState.trajectoryA.player.setParameters({
           step: 1,
@@ -1103,7 +1272,7 @@
       lucide.createIcons();
     }
 
-    // 【核心修改點 2】：特寫時兩邊同時特寫並透明化
+    // 特寫切換 (雙側同時透明化並聚焦特寫)
     function toggleFocus() {
       if (!appState.compA) return;
       appState.isFocusMode = !appState.isFocusMode;
@@ -1115,13 +1284,13 @@
         applyStageARepresentations();
         if (appState.compB) applyStageBRepresentations();
         
-        // 兩側相機平滑放大聚焦於 K114 與 DG82 介面
+        // 帶舒適 Padding 的平滑聚焦，避免裁切邊緣蛋白質
         const focusSeleA = `(${appState.actualKResnoInPdbA} and protein) or (${appState.actualDGResnoInPdbA} and not protein)`;
-        appState.compA.autoView(focusSeleA, 800);
+        appState.compA.autoView(focusSeleA, 600);
 
         if (appState.compB && appState.actualKResnoInPdbB) {
           const focusSeleB = `(${appState.actualKResnoInPdbB} and protein) or (${appState.actualDGResnoInPdbB} and not protein)`;
-          appState.compB.autoView(focusSeleB, 800);
+          appState.compB.autoView(focusSeleB, 600);
         }
       } else {
         dom.btnFocusPair.classList.remove('bg-amber-500/30', 'border-amber-400');
@@ -1129,8 +1298,9 @@
         applyStageARepresentations();
         if (appState.compB) applyStageBRepresentations();
         
-        appState.stageA.autoView(600);
-        if (appState.compB) appState.stageB.autoView(600);
+        // 恢復全覽居中視角
+        appState.stageA.autoView(500);
+        if (appState.compB) appState.stageB.autoView(500);
       }
     }
 
@@ -1168,7 +1338,6 @@
         appState.trajCompA = trajComp;
         appState.trajectoryA = trajectory;
 
-        // 綁定換幀事件
         trajectory.signals.frameChanged.add(function (frameIndex) {
           appState.currentFrameA = frameIndex;
           dom.slider.value = frameIndex;
@@ -1221,7 +1390,6 @@
 
         const comp = await appState.stageB.loadFile(url, { defaultRepresentation: false, asTrajectory: true });
         appState.compB = comp;
-        dom.badgeTitleB.textContent = `視窗 B: ${url.replace(/\.pdb(\.gz)?$/i, '')}`;
 
         comp.structure.eachResidue(r => {
           const rn = (r.resname || '').trim().toUpperCase();
@@ -1233,15 +1401,31 @@
         analyzeStructureForStageB(comp.structure);
         applyStageBRepresentations();
 
+        // 綁定結構 B 軌跡與幀數監聽
         try {
           const trajCompB = comp.addTrajectory();
           appState.trajCompB = trajCompB;
           appState.trajectoryB = trajCompB.trajectory;
-        } catch (e) {}
+
+          const handleCountB = (count) => {
+            appState.totalFramesB = count || 1;
+            const typeStr = (count > 1) ? `[軌跡: ${count} 幀]` : `[單結構]`;
+            dom.badgeTitleB.textContent = `視窗 B: ${url.replace(/\.pdb(\.gz)?$/i, '')} ${typeStr}`;
+            
+            if (appState.isPlaying) {
+              startPlayback();
+            }
+          };
+
+          trajCompB.trajectory.signals.countChanged.add(handleCountB);
+          handleCountB(trajCompB.trajectory.frameCount || 1);
+        } catch (e) {
+          appState.totalFramesB = 1;
+        }
 
         comp.autoView(500);
 
-        // 自動執行包含鹼基環在內的三維對齊
+        // 執行包含 DNA 鹼基中心在內的高精度 Kabsch 對齊
         alignStructureBToA();
 
       } catch (err) {
@@ -1252,7 +1436,7 @@
       }
     }
 
-    // 左右對比開關切換
+    // 左右對比開啟
     function enableSplitMode() {
       appState.isSplitMode = true;
       dom.splitStatus.textContent = 'ON';
@@ -1266,7 +1450,6 @@
       dom.viewportB.classList.remove('hidden');
       dom.viewportB.classList.add('w-1/2');
 
-      // 調整雙視窗尺寸
       appState.stageA.handleResize();
       appState.stageB.handleResize();
 
@@ -1277,7 +1460,7 @@
       }
     }
 
-    // 【核心修改點 3】：取消左右雙分割時，立刻精準回歸畫面正中間
+    // 取消左右對比 (瞬間居中校正)
     function disableSplitMode() {
       appState.isSplitMode = false;
       dom.splitStatus.textContent = 'OFF';
@@ -1291,7 +1474,7 @@
       dom.viewportA.classList.remove('w-1/2');
       dom.viewportA.classList.add('w-full');
 
-      // 即時重新計算 WebGL 視口大小，並將相機強制重置回視野正中央
+      // 視口強制重算與全螢幕視野居中
       appState.stageA.handleResize();
       if (appState.compA) {
         if (appState.isFocusMode) {
@@ -1302,7 +1485,6 @@
         }
       }
 
-      // 額外於下一幀再校正一次，保證 100% 居中
       requestAnimationFrame(() => {
         appState.stageA.handleResize();
       });
@@ -1384,8 +1566,14 @@
 
       dom.btnPlay.addEventListener('click', togglePlay);
 
-      dom.btnPrevFrame.addEventListener('click', () => { pausePlayback(); stepFrame(-1); });
-      dom.btnNextFrame.addEventListener('click', () => { pausePlayback(); stepFrame(1); });
+      dom.btnPrevFrame.addEventListener('click', () => {
+        pausePlayback();
+        if (appState.trajectoryA && appState.trajectoryA.player) appState.trajectoryA.player.previous();
+      });
+      dom.btnNextFrame.addEventListener('click', () => {
+        pausePlayback();
+        if (appState.trajectoryA && appState.trajectoryA.player) appState.trajectoryA.player.next();
+      });
       dom.btnFirstFrame.addEventListener('click', () => { pausePlayback(); setFrame(0); });
       dom.btnLastFrame.addEventListener('click', () => { pausePlayback(); setFrame(appState.totalFramesA - 1); });
 
@@ -1399,7 +1587,7 @@
         else enableSplitMode();
       });
 
-      // 【核心修改點 4】：點擊「同步對齊」切換時，如果切為 ON，額外執行一次嚴格對齊
+      // 同步對齊切換 (強制重新嚴格對齊)
       dom.btnToggleSync.addEventListener('click', () => {
         appState.syncCamera = !appState.syncCamera;
         dom.syncStatus.textContent = appState.syncCamera ? 'ON' : 'OFF';
@@ -1410,7 +1598,7 @@
         }
       });
 
-      // 【核心修改點 3】：平滑內插開關事件監聽 (Spline Interpolation)
+      // 平滑內插開關
       dom.btnToggleInterpolate.addEventListener('click', () => {
         appState.interpolateOn = !appState.interpolateOn;
         dom.interpolateStatus.textContent = appState.interpolateOn ? 'ON' : 'OFF';
@@ -1433,19 +1621,20 @@
         appState.fps = speeds[(curIdx + 1) % speeds.length];
         dom.activeSpeedTag.textContent = `${appState.fps} FPS`;
         if (appState.isPlaying) {
-          pausePlayback();
           startPlayback();
         }
       });
 
       dom.btnLoopMode.addEventListener('click', () => {
-        if (appState.loopMode === 'loop') {
-          appState.loopMode = 'rock'; dom.loopLabel.textContent = '往返';
-        } else if (appState.loopMode === 'rock') {
-          appState.loopMode = 'once'; dom.loopLabel.textContent = '單次';
-        } else {
-          appState.loopMode = 'loop'; dom.loopLabel.textContent = '循環';
+        if (!appState.trajectoryA || !appState.trajectoryA.player) return;
+        const curMode = appState.trajectoryA.player.parameters.mode;
+        const nextMode = (curMode === 'loop') ? 'rock' : (curMode === 'rock' ? 'once' : 'loop');
+        appState.loopMode = nextMode;
+        appState.trajectoryA.player.setParameters({ mode: nextMode });
+        if (appState.trajectoryB && appState.trajectoryB.player) {
+          appState.trajectoryB.player.setParameters({ mode: nextMode });
         }
+        dom.loopLabel.textContent = nextMode === 'loop' ? '循環' : (nextMode === 'rock' ? '往返' : '單次');
       });
 
       dom.btnResetView.addEventListener('click', () => {
