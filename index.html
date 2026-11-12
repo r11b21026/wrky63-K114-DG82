@@ -17,8 +17,9 @@
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     }
     input[type=range] { accent-color: #38bdf8; }
-    .custom-bottom-timeline { bottom: calc(1.2rem + env(safe-area-inset-bottom, 0px)); }
-    @media (min-width: 640px) { .custom-bottom-timeline { bottom: 1.8rem; } }
+    /* 1. 提高播放控制列位置，避開手機瀏覽器底部工具列與 Home Bar */
+    .custom-bottom-timeline { bottom: calc(3.6rem + env(safe-area-inset-bottom, 0px)); }
+    @media (min-width: 640px) { .custom-bottom-timeline { bottom: 2.6rem; } }
     .pulse-danger { box-shadow: 0 0 15px rgba(239, 68, 68, 0.6); border-color: #ef4444 !important; }
     
     /* 隱藏水平捲軸但保留滑動功能（手機端頂部工具列專用） */
@@ -30,16 +31,16 @@
 
   <!-- 3D 渲染視窗容器 -->
   <div id="viewport-container" class="w-full h-full relative flex flex-row overflow-hidden">
-    <!-- 左側視窗 (結構 A) -->
+    <!-- 左側視窗 (Panel A) -->
     <div id="viewport-a" class="w-full h-full relative cursor-grab active:cursor-grabbing"></div>
 
-    <!-- 右側視窗 (結構 B - 左右對比時展開) -->
+    <!-- 右側視窗 (Panel B - 左右對比時展開) -->
     <div id="viewport-b" class="hidden w-1/2 h-full relative cursor-grab active:cursor-grabbing border-l border-slate-700/80">
-      <!-- 視窗 B 標題與即時距離獨立群組（右上角完全淨空，不再被 DNA 圖例遮擋） -->
+      <!-- 3. Panel B 明確標示與即時距離標籤 -->
       <div class="absolute top-24 sm:top-16 left-2 right-2 sm:left-3 sm:right-3 z-10 pointer-events-none flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5">
-        <div class="inline-flex items-center space-x-1.5 bg-slate-900/85 backdrop-blur-md px-2 py-1 rounded-lg border border-cyan-500/40 text-[10px] sm:text-[11px] font-mono font-bold text-cyan-300 self-start max-w-full truncate">
-          <span class="w-2 h-2 rounded-full bg-cyan-400 shrink-0"></span>
-          <span id="badge-title-b" class="truncate">視窗 B (對比結構)</span>
+        <div class="inline-flex items-center space-x-1.5 bg-slate-900/90 backdrop-blur-md px-2.5 py-1 rounded-lg border border-purple-500/50 text-[10px] sm:text-[11px] font-mono font-bold text-purple-300 shadow-lg self-start max-w-full truncate">
+          <span class="px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-200 border border-purple-400/40 shrink-0">Panel B</span>
+          <span id="badge-title-b" class="truncate text-slate-200">對比結構</span>
         </div>
         <!-- 右側視窗專屬即時測距標籤 (HUD B) -->
         <div id="hud-b-badge" class="inline-flex items-center space-x-1.5 bg-slate-900/90 backdrop-blur-md px-2.5 py-1 rounded-lg border border-slate-700 text-[10px] sm:text-[11px] font-mono font-bold text-emerald-300 shadow-lg self-start sm:self-auto shrink-0">
@@ -52,24 +53,24 @@
 
   <!-- 頂部響應式控制列 -->
   <header class="absolute top-2.5 sm:top-3 left-2.5 sm:left-3 right-2.5 sm:right-3 z-20 flex flex-col sm:flex-row sm:items-center sm:justify-between pointer-events-none gap-2">
-    <!-- 結構選擇器群組（手機上開啟對比時並排各佔 50%，桌面版並排不壓縮） -->
+    <!-- 結構選擇器群組 -->
     <div id="selectors-group" class="flex items-center gap-1.5 sm:gap-2 pointer-events-auto w-full sm:w-auto">
-      <div class="bg-slate-900/90 backdrop-blur-md border border-slate-700/80 rounded-xl px-2 py-1 sm:px-2.5 sm:py-1.5 flex items-center space-x-1.5 sm:space-x-2 shadow-lg flex-1 sm:w-64 min-w-0">
-        <span class="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-cyan-400 shrink-0"></span>
+      <div class="bg-slate-900/90 backdrop-blur-md border border-cyan-500/40 rounded-xl px-2 py-1 sm:px-2.5 sm:py-1.5 flex items-center space-x-1.5 sm:space-x-2 shadow-lg flex-1 sm:w-64 min-w-0">
+        <span class="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shrink-0">A</span>
         <select id="file-selector-a" class="bg-slate-800 border border-slate-700 text-cyan-200 text-[11px] sm:text-xs rounded-lg px-1.5 py-1 w-full truncate focus:outline-none cursor-pointer">
           <option value="" disabled selected>搜尋結構中...</option>
         </select>
       </div>
 
-      <div id="file-box-b" class="hidden bg-slate-900/90 backdrop-blur-md border border-cyan-500/40 rounded-xl px-2 py-1 sm:px-2.5 sm:py-1.5 flex items-center space-x-1.5 sm:space-x-2 shadow-lg flex-1 sm:w-64 min-w-0">
-        <span class="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-cyan-400 shrink-0"></span>
-        <select id="file-selector-b" class="bg-slate-800 border border-slate-700 text-cyan-200 text-[11px] sm:text-xs rounded-lg px-1.5 py-1 w-full truncate focus:outline-none cursor-pointer">
+      <div id="file-box-b" class="hidden bg-slate-900/90 backdrop-blur-md border border-purple-500/40 rounded-xl px-2 py-1 sm:px-2.5 sm:py-1.5 flex items-center space-x-1.5 sm:space-x-2 shadow-lg flex-1 sm:w-64 min-w-0">
+        <span class="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/40 shrink-0">B</span>
+        <select id="file-selector-b" class="bg-slate-800 border border-slate-700 text-purple-200 text-[11px] sm:text-xs rounded-lg px-1.5 py-1 w-full truncate focus:outline-none cursor-pointer">
           <option value="" disabled selected>選擇對比結構 B...</option>
         </select>
       </div>
     </div>
 
-    <!-- 功能按鈕列（手機版單行水平滑動，絕不折行下壓擋住 HUD） -->
+    <!-- 功能按鈕列 -->
     <div class="flex items-center space-x-1.5 sm:space-x-2 pointer-events-auto overflow-x-auto no-scrollbar pb-0.5 sm:pb-0 shrink-0">
       <button id="btn-toggle-split" class="bg-slate-900/90 backdrop-blur-md border border-purple-500/50 hover:bg-slate-800 text-purple-300 px-2 py-1.5 sm:px-2.5 rounded-xl text-[11px] sm:text-xs font-semibold flex items-center space-x-1 sm:space-x-1.5 transition shadow-lg shrink-0" title="左右各放一個 PDB 同步對比">
         <i data-lucide="columns-2" class="w-3.5 h-3.5 text-purple-400 shrink-0"></i>
@@ -102,12 +103,12 @@
     </div>
   </header>
 
-  <!-- 左上方統一資訊群組（依序垂直排列：視窗 A 標籤 -> HUD 面板 -> DNA 圖例，徹底避免重疊） -->
+  <!-- 左上方統一資訊群組（3. Panel A 明確標示 -> HUD 面板 -> DNA 圖例） -->
   <div id="left-hud-stack" class="absolute top-24 sm:top-16 left-2.5 sm:left-3 z-20 pointer-events-none flex flex-col items-start gap-1.5 sm:gap-2 max-w-[46vw] sm:max-w-none">
-    <!-- 視窗 A 標題標籤 -->
-    <div class="inline-flex items-center space-x-1.5 bg-slate-900/85 backdrop-blur-md px-2 py-1 sm:px-2.5 rounded-lg border border-cyan-500/40 text-[10px] sm:text-[11px] font-mono font-bold text-cyan-300 max-w-full">
-      <span class="w-2 h-2 rounded-full bg-cyan-400 animate-pulse shrink-0"></span>
-      <span id="badge-title-a" class="truncate">視窗 A (主結構)</span>
+    <!-- Panel A 標題標籤 -->
+    <div class="inline-flex items-center space-x-1.5 bg-slate-900/90 backdrop-blur-md px-2.5 py-1 rounded-lg border border-cyan-500/50 text-[10px] sm:text-[11px] font-mono font-bold text-cyan-300 shadow-lg max-w-full">
+      <span class="px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-200 border border-cyan-400/40 shrink-0">Panel A</span>
+      <span id="badge-title-a" class="truncate text-slate-200">主結構</span>
     </div>
 
     <!-- HUD 狀態面板 -->
@@ -138,7 +139,7 @@
       </div>
     </div>
 
-    <!-- DNA 鹼基顏色圖例（整合至此，不再佔用右上角遮擋 Panel B 距離） -->
+    <!-- DNA 鹼基顏色圖例 -->
     <div id="base-legend" class="bg-slate-900/85 backdrop-blur-md border border-slate-700/70 rounded-lg sm:rounded-xl px-2 py-1 sm:px-2.5 sm:py-1.5 shadow-lg text-[9px] sm:text-[10px] font-mono inline-flex items-center gap-1.5 sm:gap-2">
       <span class="text-slate-400 font-bold border-r border-slate-700 pr-1.5">DNA</span>
       <div class="flex items-center space-x-1"><span class="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full" style="background:#3859F2"></span><span class="text-slate-300">A</span></div>
@@ -173,7 +174,6 @@
         </button>
 
         <div class="flex items-center space-x-1 sm:space-x-1.5">
-          <!-- 手機版隱藏首幀/末幀按鈕以防誤觸，直接拖動上方時間軸即可 -->
           <button id="btn-first-frame" class="hidden sm:inline-flex p-1.5 rounded-lg hover:bg-slate-800 text-slate-300 hover:text-white transition">
             <i data-lucide="skip-back" class="w-4 h-4"></i>
           </button>
@@ -242,7 +242,8 @@
 
       zincRepA: null, zincRepB: null,
       licoriceRepA: null, licoriceRepB: null,
-      distRepA: null, distRepB: null
+      distRepA: null, distRepB: null,
+      labelShapeCompA: null, labelShapeCompB: null
     };
 
     lucide.createIcons();
@@ -368,7 +369,6 @@
       } catch (e) {}
     }
 
-    // 計算三點形成的夾角 ABC (以 B 為頂點)，回傳角度 (Degree)
     function calculateAngle(pA, pB, pC) {
       const v1 = [pA.x - pB.x, pA.y - pB.y, pA.z - pB.z];
       const v2 = [pC.x - pB.x, pC.y - pB.y, pC.z - pB.z];
@@ -639,7 +639,69 @@
       }
     }
 
-    // 行動端強化：獨立重繪視窗 A 鋅離子（禁用 Impostor 避免定死在螢幕）
+    // 2. 用 Shape.addText 繪製無黑棒、純淨漂浮的 K114 與 DG82 3D 標籤（Panel A）
+    function updateFocusLabelsA() {
+      if (appState.labelShapeCompA) {
+        appState.stageA.removeComponent(appState.labelShapeCompA);
+        appState.labelShapeCompA = null;
+      }
+      if (!appState.isFocusMode || !appState.compA || !appState.actualKResnoInPdbA) return;
+
+      const st = appState.compA.structure;
+      let posK = null, posDG = null;
+
+      st.eachResidue(r => {
+        const rn = (r.resname || '').trim().toUpperCase();
+        if (r.resno === appState.actualKResnoInPdbA && (r.isProtein() || rn === 'LYS')) {
+          r.eachAtom(a => { if (a.atomname.trim() === 'NZ') posK = [a.x, a.y + 0.85, a.z]; });
+        }
+        if (r.resno === appState.actualDGResnoInPdbA) {
+          r.eachAtom(a => { if (a.atomname.trim() === 'O6') posDG = [a.x, a.y + 0.85, a.z]; });
+        }
+      });
+
+      if (posK || posDG) {
+        const shape = new NGL.Shape("clean_labels_a");
+        if (posK) shape.addText(posK, [0.22, 0.74, 0.97], 1.5, `K${STANDARD_TARGET_K}`);
+        if (posDG) shape.addText(posDG, [0.15, 0.85, 0.45], 1.5, `DG${STANDARD_TARGET_DG}`);
+        appState.labelShapeCompA = appState.stageA.addComponentFromObject(shape);
+        appState.labelShapeCompA.addRepresentation("buffer");
+      }
+    }
+
+    // 2. 用 Shape.addText 繪製無黑棒、純淨漂浮的 K114 與 DG82 3D 標籤（Panel B，同步套用對齊矩陣）
+    function updateFocusLabelsB() {
+      if (appState.labelShapeCompB) {
+        appState.stageB.removeComponent(appState.labelShapeCompB);
+        appState.labelShapeCompB = null;
+      }
+      if (!appState.isFocusMode || !appState.compB || !appState.actualKResnoInPdbB) return;
+
+      const st = appState.compB.structure;
+      let posK = null, posDG = null;
+
+      st.eachResidue(r => {
+        const rn = (r.resname || '').trim().toUpperCase();
+        if (r.resno === appState.actualKResnoInPdbB && (r.isProtein() || rn === 'LYS')) {
+          r.eachAtom(a => { if (a.atomname.trim() === 'NZ') posK = [a.x, a.y + 0.85, a.z]; });
+        }
+        if (r.resno === appState.actualDGResnoInPdbB) {
+          r.eachAtom(a => { if (a.atomname.trim() === 'O6') posDG = [a.x, a.y + 0.85, a.z]; });
+        }
+      });
+
+      if (posK || posDG) {
+        const shape = new NGL.Shape("clean_labels_b");
+        if (posK) shape.addText(posK, [0.22, 0.74, 0.97], 1.5, `K${STANDARD_TARGET_K}`);
+        if (posDG) shape.addText(posDG, [0.15, 0.85, 0.45], 1.5, `DG${STANDARD_TARGET_DG}`);
+        appState.labelShapeCompB = appState.stageB.addComponentFromObject(shape);
+        appState.labelShapeCompB.addRepresentation("buffer");
+        if (appState.transformMatrixB) {
+          appState.labelShapeCompB.setTransform(appState.transformMatrixB);
+        }
+      }
+    }
+
     function updateZincA() {
       if (!appState.compA) return;
       if (appState.zincRepA) {
@@ -657,7 +719,6 @@
       });
     }
 
-    // 行動端強化：獨立重繪視窗 B 鋅離子
     function updateZincB() {
       if (!appState.compB) return;
       if (appState.zincRepB) {
@@ -675,7 +736,6 @@
       });
     }
 
-    // 行動端強化：獨立重繪視窗 A 特寫殘基（排除怪異圓點）
     function updateFocusPairA() {
       if (!appState.compA) return;
       if (appState.licoriceRepA) {
@@ -694,9 +754,9 @@
           radialSegments: 10
         });
       }
+      updateFocusLabelsA();
     }
 
-    // 行動端強化：獨立重繪視窗 B 特寫殘基
     function updateFocusPairB() {
       if (!appState.compB) return;
       if (appState.licoriceRepB) {
@@ -715,6 +775,7 @@
           radialSegments: 10
         });
       }
+      updateFocusLabelsB();
     }
 
     function updateDnaRungsA() {
@@ -779,7 +840,6 @@
       }
     }
 
-    // 繪製結構 A 表示法
     function applyStageARepresentations() {
       if (!appState.compA) return;
       appState.compA.removeAllRepresentations();
@@ -813,10 +873,11 @@
             atomPair: appState.dynamicPairsA, color: lineColor, radius: 0.05, dashLength: 0.22, labelUnit: 'angstrom', labelSize: 1.3, labelColor: '#facc15', labelBackground: false
           });
         }
+      } else {
+        updateFocusLabelsA();
       }
     }
 
-    // 繪製結構 B 表示法
     function applyStageBRepresentations() {
       if (!appState.compB) return;
       appState.compB.removeAllRepresentations();
@@ -850,6 +911,8 @@
             atomPair: appState.dynamicPairsB, color: lineColorB, radius: 0.05, dashLength: 0.22, labelUnit: 'angstrom', labelSize: 1.3, labelColor: '#facc15', labelBackground: false
           });
         }
+      } else {
+        updateFocusLabelsB();
       }
     }
 
@@ -1021,6 +1084,9 @@
           if (appState.ladderShapeCompB) {
             appState.ladderShapeCompB.setTransform(m4);
           }
+          if (appState.labelShapeCompB) {
+            appState.labelShapeCompB.setTransform(m4);
+          }
 
           appState.stageB.viewer.requestRender();
         }
@@ -1180,19 +1246,17 @@
 
     async function loadPdbFileA(url) {
       pausePlayback();
-      showLoading(`載入視窗 A: ${url}`);
+      showLoading(`載入 Panel A: ${url}`);
       dom.bottomTimeline.classList.add('hidden');
 
       try {
         appState.stageA.removeAllComponents();
-        if (appState.ladderShapeCompA) {
-          appState.stageA.removeComponent(appState.ladderShapeCompA);
-          appState.ladderShapeCompA = null;
-        }
+        appState.ladderShapeCompA = null;
+        appState.labelShapeCompA = null;
 
         const comp = await appState.stageA.loadFile(url, { defaultRepresentation: false, asTrajectory: true });
         appState.compA = comp;
-        dom.badgeTitleA.textContent = `A: ${url.replace(/\.pdb(\.gz)?$/i, '')}`;
+        dom.badgeTitleA.textContent = url.replace(/\.pdb(\.gz)?$/i, '');
 
         comp.structure.eachResidue(r => {
           const rn = (r.resname || '').trim().toUpperCase();
@@ -1253,18 +1317,16 @@
 
     async function loadPdbFileB(url) {
       if (!url) return;
-      showLoading(`載入視窗 B: ${url}`);
+      showLoading(`載入 Panel B: ${url}`);
 
       try {
         appState.stageB.removeAllComponents();
-        if (appState.ladderShapeCompB) {
-          appState.stageB.removeComponent(appState.ladderShapeCompB);
-          appState.ladderShapeCompB = null;
-        }
+        appState.ladderShapeCompB = null;
+        appState.labelShapeCompB = null;
 
         const comp = await appState.stageB.loadFile(url, { defaultRepresentation: false, asTrajectory: true });
         appState.compB = comp;
-        dom.badgeTitleB.textContent = `B: ${url.replace(/\.pdb(\.gz)?$/i, '')}`;
+        dom.badgeTitleB.textContent = url.replace(/\.pdb(\.gz)?$/i, '');
 
         comp.structure.eachResidue(r => {
           const rn = (r.resname || '').trim().toUpperCase();
@@ -1294,7 +1356,7 @@
           const handleCountB = (count) => {
             appState.totalFramesB = count || 1;
             const typeStr = (count > 1) ? `[${count}幀]` : `[單結構]`;
-            dom.badgeTitleB.textContent = `B: ${url.replace(/\.pdb(\.gz)?$/i, '')} ${typeStr}`;
+            dom.badgeTitleB.textContent = `${url.replace(/\.pdb(\.gz)?$/i, '')} ${typeStr}`;
             configureAndSyncPlayers();
             if (appState.isPlaying && count > 1) {
               trajCompB.trajectory.player.play();
