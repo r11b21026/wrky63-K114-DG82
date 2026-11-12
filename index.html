@@ -17,12 +17,10 @@
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     }
     input[type=range] { accent-color: #38bdf8; }
-    /* 1. 提高播放控制列位置，避開手機瀏覽器底部工具列與 Home Bar */
     .custom-bottom-timeline { bottom: calc(3.6rem + env(safe-area-inset-bottom, 0px)); }
     @media (min-width: 640px) { .custom-bottom-timeline { bottom: 2.6rem; } }
     .pulse-danger { box-shadow: 0 0 15px rgba(239, 68, 68, 0.6); border-color: #ef4444 !important; }
     
-    /* 隱藏水平捲軸但保留滑動功能（手機端頂部工具列專用） */
     .no-scrollbar::-webkit-scrollbar { display: none; }
     .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
   </style>
@@ -36,16 +34,22 @@
 
     <!-- 右側視窗 (Panel B - 左右對比時展開) -->
     <div id="viewport-b" class="hidden w-1/2 h-full relative cursor-grab active:cursor-grabbing border-l border-slate-700/80">
-      <!-- 3. Panel B 明確標示與即時距離標籤 -->
-      <div class="absolute top-24 sm:top-16 left-2 right-2 sm:left-3 sm:right-3 z-10 pointer-events-none flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5">
+      <!-- Panel B 標題與雙距離即時標籤 -->
+      <div class="absolute top-24 sm:top-16 left-2 right-2 sm:left-3 sm:right-3 z-10 pointer-events-none flex flex-col sm:flex-row sm:items-start sm:justify-between gap-1.5">
         <div class="inline-flex items-center space-x-1.5 bg-slate-900/90 backdrop-blur-md px-2.5 py-1 rounded-lg border border-purple-500/50 text-[10px] sm:text-[11px] font-mono font-bold text-purple-300 shadow-lg self-start max-w-full truncate">
           <span class="px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-200 border border-purple-400/40 shrink-0">Panel B</span>
           <span id="badge-title-b" class="truncate text-slate-200">對比結構</span>
         </div>
-        <!-- 右側視窗專屬即時測距標籤 (HUD B) -->
-        <div id="hud-b-badge" class="inline-flex items-center space-x-1.5 bg-slate-900/90 backdrop-blur-md px-2.5 py-1 rounded-lg border border-slate-700 text-[10px] sm:text-[11px] font-mono font-bold text-emerald-300 shadow-lg self-start sm:self-auto shrink-0">
-          <span>B 距離:</span>
-          <span id="hud-b-dist-val" class="text-emerald-400">-- Å</span>
+        <!-- 右側視窗專屬雙距離測距卡片 (HUD B) -->
+        <div id="hud-b-badge" class="bg-slate-900/90 backdrop-blur-md px-2.5 py-1.5 rounded-xl border border-slate-700/90 text-[10px] sm:text-[11px] font-mono font-bold shadow-lg self-start sm:self-auto shrink-0 flex flex-col gap-1">
+          <div class="flex items-center justify-between gap-2">
+            <span class="text-slate-400">DG82:</span>
+            <span id="hud-b-dist-val" class="text-emerald-400">-- Å</span>
+          </div>
+          <div class="flex items-center justify-between gap-2 border-t border-slate-800 pt-1">
+            <span id="hud-b-base81-label" class="text-sky-300">Base81:</span>
+            <span id="hud-b-dist81-val" class="text-sky-400">-- Å</span>
+          </div>
         </div>
       </div>
     </div>
@@ -91,9 +95,9 @@
         <span id="interpolate-status" class="font-bold text-emerald-400">ON</span>
       </button>
 
-      <button id="btn-focus-pair" title="特寫 K114 與 DG82 介面" class="bg-slate-900/90 backdrop-blur-md border border-amber-500/50 hover:bg-amber-950/40 text-amber-300 px-2 py-1.5 sm:px-2.5 rounded-xl text-[11px] sm:text-xs font-semibold flex items-center space-x-1 sm:space-x-1.5 transition shadow-lg shrink-0">
+      <button id="btn-focus-pair" title="特寫 K114 與 Base 81 / DG82 介面" class="bg-slate-900/90 backdrop-blur-md border border-amber-500/50 hover:bg-amber-950/40 text-amber-300 px-2 py-1.5 sm:px-2.5 rounded-xl text-[11px] sm:text-xs font-semibold flex items-center space-x-1 sm:space-x-1.5 transition shadow-lg shrink-0">
         <i data-lucide="sparkles" class="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-400 shrink-0"></i>
-        <span id="focus-btn-text" class="hidden sm:inline">特寫 K114 - DG82</span>
+        <span id="focus-btn-text" class="hidden sm:inline">特寫 K114 - B81/82</span>
         <span id="focus-btn-text-mobile" class="sm:hidden">特寫</span>
       </button>
 
@@ -103,39 +107,70 @@
     </div>
   </header>
 
-  <!-- 左上方統一資訊群組（3. Panel A 明確標示 -> HUD 面板 -> DNA 圖例） -->
-  <div id="left-hud-stack" class="absolute top-24 sm:top-16 left-2.5 sm:left-3 z-20 pointer-events-none flex flex-col items-start gap-1.5 sm:gap-2 max-w-[46vw] sm:max-w-none">
+  <!-- 左上方統一資訊群組（Panel A 明確標示 -> 雙指標 HUD 面板 -> DNA 圖例） -->
+  <div id="left-hud-stack" class="absolute top-24 sm:top-16 left-2.5 sm:left-3 z-20 pointer-events-none flex flex-col items-start gap-1.5 sm:gap-2 max-w-[48vw] sm:max-w-none">
     <!-- Panel A 標題標籤 -->
     <div class="inline-flex items-center space-x-1.5 bg-slate-900/90 backdrop-blur-md px-2.5 py-1 rounded-lg border border-cyan-500/50 text-[10px] sm:text-[11px] font-mono font-bold text-cyan-300 shadow-lg max-w-full">
       <span class="px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-200 border border-cyan-400/40 shrink-0">Panel A</span>
       <span id="badge-title-a" class="truncate text-slate-200">主結構</span>
     </div>
 
-    <!-- HUD 狀態面板 -->
-    <div id="hud-panel" class="bg-slate-900/90 backdrop-blur-md border border-slate-700/80 rounded-xl sm:rounded-2xl p-2 sm:p-3 shadow-xl flex flex-col space-y-1.5 sm:space-y-2 w-full sm:min-w-[215px] transition-all duration-300">
-      <div class="flex flex-wrap items-center justify-between border-b border-slate-800 pb-1 gap-1">
-        <span class="text-[10px] sm:text-[11px] font-bold text-slate-300 flex items-center gap-1">
-          <span id="status-indicator-dot" class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0"></span>
-          <span>K114-DG82</span>
-        </span>
-        <span id="hud-state-badge" class="text-[8px] sm:text-[9px] font-mono px-1 sm:px-1.5 py-0.5 rounded font-bold bg-emerald-950/70 border border-emerald-500/50 text-emerald-300">
-          結合 (Stable)
-        </span>
+    <!-- 雙重距離即時 HUD 狀態面板 -->
+    <div id="hud-panel" class="bg-slate-900/90 backdrop-blur-md border border-slate-700/80 rounded-xl sm:rounded-2xl p-2 sm:p-3 shadow-xl flex flex-col space-y-2 w-full sm:min-w-[235px] transition-all duration-300">
+      
+      <!-- 指標 1：K114(NZ) - DG82(O6) -->
+      <div class="flex flex-col space-y-1">
+        <div class="flex flex-wrap items-center justify-between gap-1">
+          <span class="text-[10px] sm:text-[11px] font-bold text-slate-300 flex items-center gap-1">
+            <span id="status-indicator-dot" class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0"></span>
+            <span>K114 - DG82(O6)</span>
+          </span>
+          <span id="hud-state-badge" class="text-[8px] sm:text-[9px] font-mono px-1 sm:px-1.5 py-0.5 rounded font-bold bg-emerald-950/70 border border-emerald-500/50 text-emerald-300">
+            氫鍵鎖定
+          </span>
+        </div>
+
+        <div class="flex items-baseline justify-between">
+          <span class="text-[10px] text-slate-400">鍵長:</span>
+          <span id="hud-distance-val" class="text-xs sm:text-base font-mono font-bold text-emerald-400">2.82 Å</span>
+        </div>
+
+        <div class="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden flex relative">
+          <div id="hud-dist-bar" class="h-full bg-emerald-500 transition-all duration-150" style="width: 28%;"></div>
+          <div class="absolute top-0 bottom-0 left-[50%] w-0.5 bg-rose-500/80 z-10" title="3.5 Å 截斷門檻"></div>
+        </div>
       </div>
 
-      <div class="flex items-baseline justify-between">
-        <span class="text-[10px] sm:text-xs text-slate-400">距離:</span>
-        <span id="hud-distance-val" class="text-sm sm:text-lg font-mono font-bold text-emerald-400">2.82 Å</span>
+      <!-- 分隔線 -->
+      <div class="border-t border-slate-800"></div>
+
+      <!-- 指標 2：K114(NZ) - Base 81 Major-Groove Edge -->
+      <div class="flex flex-col space-y-1">
+        <div class="flex flex-wrap items-center justify-between gap-1">
+          <span class="text-[10px] sm:text-[11px] font-bold text-sky-300 flex items-center gap-1">
+            <span id="status-dot-81" class="w-2 h-2 rounded-full bg-sky-400 shrink-0"></span>
+            <span id="hud-base81-title">K114 - B81 Edge</span>
+          </span>
+          <span id="hud-state81-badge" class="text-[8px] sm:text-[9px] font-mono px-1 sm:px-1.5 py-0.5 rounded font-bold bg-sky-950/70 border border-sky-500/50 text-sky-300">
+            Major Edge
+          </span>
+        </div>
+
+        <div class="flex items-baseline justify-between">
+          <span id="hud-base81-atom-hint" class="text-[9px] sm:text-[10px] text-slate-400">大溝邊緣距離:</span>
+          <span id="hud-distance81-val" class="text-xs sm:text-base font-mono font-bold text-sky-400">-- Å</span>
+        </div>
+
+        <div class="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden flex relative">
+          <div id="hud-dist81-bar" class="h-full bg-sky-500 transition-all duration-150" style="width: 35%;"></div>
+          <div class="absolute top-0 bottom-0 left-[50%] w-0.5 bg-amber-400/80 z-10" title="3.5 Å 參考線"></div>
+        </div>
       </div>
 
-      <div class="w-full bg-slate-800 h-1.5 sm:h-2 rounded-full overflow-hidden flex relative">
-        <div id="hud-dist-bar" class="h-full bg-emerald-500 transition-all duration-150" style="width: 28%;"></div>
-        <div class="absolute top-0 bottom-0 left-[50%] w-0.5 bg-rose-500/80 z-10" title="3.5 Å 截斷門檻"></div>
-      </div>
-      <div class="flex justify-between text-[8px] sm:text-[9px] font-mono text-slate-500 px-0.5">
-        <span>2.0</span>
-        <span class="text-rose-400 font-bold">3.5 Å</span>
-        <span>5.0</span>
+      <div class="flex justify-between text-[8px] font-mono text-slate-500 px-0.5 pt-0.5">
+        <span>2.0 Å</span>
+        <span class="text-rose-400/90 font-bold">3.5 Å</span>
+        <span>5.0 Å</span>
       </div>
     </div>
 
@@ -212,6 +247,19 @@
     const STANDARD_ANCHOR_W = 108;
     const STANDARD_TARGET_K = 114;
     const STANDARD_TARGET_DG = 82;
+    const STANDARD_TARGET_B81 = 81;
+
+    // 各鹼基在 DNA 大溝（Major-Groove Edge）的標誌性官能基原子列表
+    const MAJOR_GROOVE_ATOMS = {
+      'DA': ['N7', 'N6'],
+      'A':  ['N7', 'N6'],
+      'DG': ['N7', 'O6'],
+      'G':  ['N7', 'O6'],
+      'DT': ['O4', 'C7', 'C5M'],
+      'T':  ['O4', 'C7', 'C5M'],
+      'DC': ['N4', 'C5'],
+      'C':  ['N4', 'C5']
+    };
 
     const appState = {
       stageA: null, stageB: null,
@@ -231,8 +279,25 @@
       interpolateStep: 6,
       isFocusMode: false,
 
-      actualKResnoInPdbA: null, actualDGResnoInPdbA: null, dynamicPairsA: [], currentDistance: 2.8,
-      actualKResnoInPdbB: null, actualDGResnoInPdbB: null, dynamicPairsB: [], currentDistanceB: 2.8,
+      // 視窗 A 追蹤狀態
+      actualKResnoInPdbA: null,
+      actualDGResnoInPdbA: null,
+      actualB81ResnoInPdbA: null,
+      b81ResnameA: 'B81',
+      dynamicPairsA: [],
+      dynamicPair81A: [],
+      currentDistance: 2.8,
+      currentDistance81A: null,
+
+      // 視窗 B 追蹤狀態
+      actualKResnoInPdbB: null,
+      actualDGResnoInPdbB: null,
+      actualB81ResnoInPdbB: null,
+      b81ResnameB: 'B81',
+      dynamicPairsB: [],
+      dynamicPair81B: [],
+      currentDistanceB: 2.8,
+      currentDistance81B: null,
 
       dnaRungStubsA: [], ladderShapeCompA: null,
       dnaRungStubsB: [], ladderShapeCompB: null,
@@ -243,6 +308,7 @@
       zincRepA: null, zincRepB: null,
       licoriceRepA: null, licoriceRepB: null,
       distRepA: null, distRepB: null,
+      distRep81A: null, distRep81B: null,
       labelShapeCompA: null, labelShapeCompB: null
     };
 
@@ -255,6 +321,8 @@
       badgeTitleB: document.getElementById('badge-title-b'),
       hudBBadge: document.getElementById('hud-b-badge'),
       hudBDistVal: document.getElementById('hud-b-dist-val'),
+      hudBBase81Label: document.getElementById('hud-b-base81-label'),
+      hudBDist81Val: document.getElementById('hud-b-dist81-val'),
       fileSelectorA: document.getElementById('file-selector-a'),
       fileSelectorB: document.getElementById('file-selector-b'),
       fileBoxB: document.getElementById('file-box-b'),
@@ -292,7 +360,15 @@
       hudDistVal: document.getElementById('hud-distance-val'),
       hudDistBar: document.getElementById('hud-dist-bar'),
       hudStateBadge: document.getElementById('hud-state-badge'),
-      statusIndicatorDot: document.getElementById('status-indicator-dot')
+      statusIndicatorDot: document.getElementById('status-indicator-dot'),
+
+      // Base 81 HUD elements
+      statusDot81: document.getElementById('status-dot-81'),
+      hudBase81Title: document.getElementById('hud-base81-title'),
+      hudState81Badge: document.getElementById('hud-state81-badge'),
+      hudBase81AtomHint: document.getElementById('hud-base81-atom-hint'),
+      hudDist81Val: document.getElementById('hud-distance81-val'),
+      hudDist81Bar: document.getElementById('hud-dist81-bar')
     };
 
     function showLoading(text) {
@@ -382,10 +458,37 @@
       return (Math.acos(cosTheta) * 180) / Math.PI;
     }
 
+    // 智慧型尋找 Base 81 殘基編號及鹼基名稱（支援突變體不同鹼基識別）
+    function findDnaTargetResidues(dnaList) {
+      let res82 = null;
+      let res81 = null;
+      let name81 = 'B81';
+
+      const found82 = dnaList.find(d => d.resno === STANDARD_TARGET_DG);
+      if (found82) {
+        res82 = found82.resno;
+      } else if (dnaList.length > 0) {
+        res82 = dnaList[0].resno;
+      } else {
+        res82 = STANDARD_TARGET_DG;
+      }
+
+      // 優先尋找標準編號 81，若無則取 82 的前一個鹼基
+      const found81 = dnaList.find(d => d.resno === STANDARD_TARGET_B81) || dnaList.find(d => d.resno === (res82 - 1));
+      if (found81) {
+        res81 = found81.resno;
+        name81 = `${found81.resname.replace(/[35]$/, '')}${found81.resno}`;
+      } else {
+        res81 = STANDARD_TARGET_B81;
+        name81 = `B${STANDARD_TARGET_B81}`;
+      }
+
+      return { res82, res81, name81 };
+    }
+
     function analyzeStructureForStageA(structure) {
       const nucleicResList = [];
       const protResList = [];
-      const dnaResnos = [];
 
       structure.eachResidue(r => {
         const rn = (r.resname || '').trim().toUpperCase();
@@ -394,7 +497,6 @@
         } else {
           const isDna = r.isNucleic() || /^(D[ATCG][35]?|[ATCG][35]?)$/.test(rn);
           if (isDna) {
-            dnaResnos.push(r.resno);
             let backboneAtom = null, baseRing = null;
             r.eachAtom(a => {
               const aname = a.atomname.trim();
@@ -419,13 +521,11 @@
       }
       appState.actualKResnoInPdbA = STANDARD_TARGET_K - deltaOffset;
 
-      if (dnaResnos.includes(STANDARD_TARGET_DG)) {
-        appState.actualDGResnoInPdbA = STANDARD_TARGET_DG;
-      } else if (dnaResnos.length > 0) {
-        appState.actualDGResnoInPdbA = dnaResnos.find(n => n === 82) || dnaResnos[0];
-      } else {
-        appState.actualDGResnoInPdbA = STANDARD_TARGET_DG;
-      }
+      const targets = findDnaTargetResidues(nucleicResList);
+      appState.actualDGResnoInPdbA = targets.res82;
+      appState.actualB81ResnoInPdbA = targets.res81;
+      appState.b81ResnameA = targets.name81;
+      dom.hudBase81Title.textContent = `K114 - ${targets.name81}`;
 
       appState.dnaRungStubsA = nucleicResList.map(item => ({ anchor: item.c1Index, target: item.ringIndex, resname: item.resname, resno: item.resno }));
     }
@@ -433,7 +533,6 @@
     function analyzeStructureForStageB(structure) {
       const nucleicResList = [];
       const protResList = [];
-      const dnaResnos = [];
 
       structure.eachResidue(r => {
         const rn = (r.resname || '').trim().toUpperCase();
@@ -442,7 +541,6 @@
         } else {
           const isDna = r.isNucleic() || /^(D[ATCG][35]?|[ATCG][35]?)$/.test(rn);
           if (isDna) {
-            dnaResnos.push(r.resno);
             let backboneAtom = null, baseRing = null;
             r.eachAtom(a => {
               const aname = a.atomname.trim();
@@ -467,15 +565,37 @@
       }
       appState.actualKResnoInPdbB = STANDARD_TARGET_K - deltaOffset;
 
-      if (dnaResnos.includes(STANDARD_TARGET_DG)) {
-        appState.actualDGResnoInPdbB = STANDARD_TARGET_DG;
-      } else if (dnaResnos.length > 0) {
-        appState.actualDGResnoInPdbB = dnaResnos.find(n => n === 82) || dnaResnos[0];
-      } else {
-        appState.actualDGResnoInPdbB = STANDARD_TARGET_DG;
-      }
+      const targets = findDnaTargetResidues(nucleicResList);
+      appState.actualDGResnoInPdbB = targets.res82;
+      appState.actualB81ResnoInPdbB = targets.res81;
+      appState.b81ResnameB = targets.name81;
+      dom.hudBBase81Label.textContent = `${targets.name81}:`;
 
       appState.dnaRungStubsB = nucleicResList.map(item => ({ anchor: item.c1Index, target: item.ringIndex, resname: item.resname, resno: item.resno }));
+    }
+
+    // 尋找特定鹼基的大溝邊緣原子集合，並計算與 K114(NZ) 的最近接觸距離與對應原子
+    function evaluateMajorGrooveContact(nzAtom, baseResidueProxy) {
+      if (!nzAtom || !baseResidueProxy) return null;
+      const rnClean = (baseResidueProxy.resname || '').trim().toUpperCase().replace(/[35]$/, '');
+      const allowedAtoms = MAJOR_GROOVE_ATOMS[rnClean] || ['N7', 'O6', 'N6', 'O4', 'C7', 'C5M', 'N4', 'C5'];
+
+      let closestAtom = null;
+      let minDist = Infinity;
+
+      baseResidueProxy.eachAtom(a => {
+        const an = a.atomname.trim();
+        if (allowedAtoms.includes(an)) {
+          const d = Math.hypot(nzAtom.x - a.x, nzAtom.y - a.y, nzAtom.z - a.z);
+          if (d < minDist) {
+            minDist = d;
+            closestAtom = { index: a.index, name: an, x: a.x, y: a.y, z: a.z };
+          }
+        }
+      });
+
+      if (!closestAtom) return null;
+      return { atom: closestAtom, dist: minDist, resname: rnClean };
     }
 
     function updateDynamicInteractionsAndHUD(structureA, structureB) {
@@ -484,8 +604,10 @@
       // --- 視窗 A 檢驗 ---
       if (structureA && appState.actualKResnoInPdbA) {
         appState.dynamicPairsA = [];
+        appState.dynamicPair81A = [];
         let nzAtom = null, ceAtom = null, hzAtoms = [];
         let targetO6 = null;
+        let base81Contact = null;
 
         structureA.eachResidue(r => {
           const rn = (r.resname || '').trim().toUpperCase();
@@ -505,6 +627,7 @@
           }
         });
 
+        // 1. 檢驗 K114 - DG82(O6) 氫鍵距離與角度
         if (nzAtom && targetO6) {
           const dist = Math.hypot(nzAtom.x - targetO6.x, nzAtom.y - targetO6.y, nzAtom.z - targetO6.z);
           appState.currentDistance = dist;
@@ -522,7 +645,6 @@
           }
 
           const isBondFormed = (dist <= DIST_CUTOFF) && angleValid;
-
           if (isBondFormed) {
             appState.dynamicPairsA.push([nzAtom.index, targetO6.index]);
           }
@@ -534,32 +656,74 @@
           if (isBondFormed) {
             dom.statusIndicatorDot.className = 'w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0';
             if (dist <= 3.2) {
-              dom.hudDistVal.className = 'text-sm sm:text-lg font-mono font-bold text-emerald-400';
+              dom.hudDistVal.className = 'text-xs sm:text-base font-mono font-bold text-emerald-400';
               dom.hudDistBar.className = 'h-full bg-emerald-500 transition-all duration-150';
-              dom.hudStateBadge.textContent = '氫鍵鎖定 (Stable)';
+              dom.hudStateBadge.textContent = '氫鍵鎖定';
               dom.hudStateBadge.className = 'text-[8px] sm:text-[9px] font-mono px-1 sm:px-1.5 py-0.5 rounded font-bold bg-emerald-950/70 border border-emerald-500/50 text-emerald-300';
             } else {
-              dom.hudDistVal.className = 'text-sm sm:text-lg font-mono font-bold text-yellow-400';
+              dom.hudDistVal.className = 'text-xs sm:text-base font-mono font-bold text-yellow-400';
               dom.hudDistBar.className = 'h-full bg-yellow-500 transition-all duration-150';
-              dom.hudStateBadge.textContent = '接近邊界 (Stretched)';
+              dom.hudStateBadge.textContent = '接近邊界';
               dom.hudStateBadge.className = 'text-[8px] sm:text-[9px] font-mono px-1 sm:px-1.5 py-0.5 rounded font-bold bg-yellow-950/70 border border-yellow-500/50 text-yellow-300';
             }
           } else {
             dom.statusIndicatorDot.className = 'w-2 h-2 rounded-full bg-rose-500 shrink-0';
-            dom.hudDistVal.className = 'text-sm sm:text-lg font-mono font-bold text-rose-400';
+            dom.hudDistVal.className = 'text-xs sm:text-base font-mono font-bold text-rose-400';
             dom.hudDistBar.className = 'h-full bg-rose-500 transition-all duration-150';
             dom.hudStateBadge.className = 'text-[8px] sm:text-[9px] font-mono px-1 sm:px-1.5 py-0.5 rounded font-bold bg-rose-950/70 border border-rose-500/50 text-rose-300';
-            dom.hudStateBadge.textContent = (dist > DIST_CUTOFF) ? '鍵長過長 (Broken)' : '角度不符 (Broken)';
+            dom.hudStateBadge.textContent = (dist > DIST_CUTOFF) ? '鍵長斷開' : '角度不符';
+          }
+        }
+
+        // 2. 檢驗 K114(NZ) - Base 81 Major-Groove Edge 距離
+        if (nzAtom && appState.actualB81ResnoInPdbA) {
+          structureA.eachResidue(r => {
+            if (r.resno === appState.actualB81ResnoInPdbA && !r.isProtein()) {
+              base81Contact = evaluateMajorGrooveContact(nzAtom, r);
+            }
+          });
+
+          if (base81Contact) {
+            const d81 = base81Contact.dist;
+            appState.currentDistance81A = d81;
+            appState.dynamicPair81A.push([nzAtom.index, base81Contact.atom.index]);
+
+            dom.hudDist81Val.textContent = `${d81.toFixed(2)} Å`;
+            dom.hudBase81AtomHint.textContent = `目標原子 (${base81Contact.atom.name}):`;
+            const pct81 = Math.min(100, Math.max(0, ((d81 - 2.0) / 3.0) * 100));
+            dom.hudDist81Bar.style.width = `${pct81}%`;
+
+            if (d81 <= 3.5) {
+              dom.statusDot81.className = 'w-2 h-2 rounded-full bg-sky-400 animate-pulse shrink-0';
+              dom.hudDist81Val.className = 'text-xs sm:text-base font-mono font-bold text-sky-400';
+              dom.hudDist81Bar.className = 'h-full bg-sky-400 transition-all duration-150';
+              dom.hudState81Badge.textContent = '緊密接觸';
+              dom.hudState81Badge.className = 'text-[8px] sm:text-[9px] font-mono px-1 sm:px-1.5 py-0.5 rounded font-bold bg-sky-950/70 border border-sky-500/50 text-sky-300';
+            } else if (d81 <= 4.5) {
+              dom.statusDot81.className = 'w-2 h-2 rounded-full bg-indigo-400 shrink-0';
+              dom.hudDist81Val.className = 'text-xs sm:text-base font-mono font-bold text-indigo-300';
+              dom.hudDist81Bar.className = 'h-full bg-indigo-400 transition-all duration-150';
+              dom.hudState81Badge.textContent = '中距靠攏';
+              dom.hudState81Badge.className = 'text-[8px] sm:text-[9px] font-mono px-1 sm:px-1.5 py-0.5 rounded font-bold bg-indigo-950/70 border border-indigo-500/50 text-indigo-300';
+            } else {
+              dom.statusDot81.className = 'w-2 h-2 rounded-full bg-slate-500 shrink-0';
+              dom.hudDist81Val.className = 'text-xs sm:text-base font-mono font-bold text-slate-300';
+              dom.hudDist81Bar.className = 'h-full bg-slate-500 transition-all duration-150';
+              dom.hudState81Badge.textContent = '遠離狀態';
+              dom.hudState81Badge.className = 'text-[8px] sm:text-[9px] font-mono px-1 sm:px-1.5 py-0.5 rounded font-bold bg-slate-800 border border-slate-600 text-slate-400';
+            }
           }
         }
       }
 
       // --- 視窗 B 檢驗 ---
       const targetStructB = structureB || (appState.compB ? appState.compB.structure : null);
-      if (targetStructB && appState.actualKResnoInPdbB && appState.actualDGResnoInPdbB) {
+      if (targetStructB && appState.actualKResnoInPdbB) {
         appState.dynamicPairsB = [];
+        appState.dynamicPair81B = [];
         let nzB = null, ceB = null, hzB = [];
         let targetO6B = null;
+        let base81ContactB = null;
 
         targetStructB.eachResidue(r => {
           const rn = (r.resname || '').trim().toUpperCase();
@@ -599,14 +763,29 @@
           if (isBondFormedB) {
             appState.dynamicPairsB.push([nzB.index, targetO6B.index]);
           }
-          dom.hudBDistVal.textContent = isBondFormedB ? `${distB.toFixed(2)} Å` : `${distB.toFixed(2)} Å (斷鍵)`;
+          dom.hudBDistVal.textContent = isBondFormedB ? `${distB.toFixed(2)} Å` : `${distB.toFixed(2)} Å (斷)`;
           dom.hudBDistVal.className = isBondFormedB ? 'text-emerald-400' : 'text-rose-400';
+        }
+
+        if (nzB && appState.actualB81ResnoInPdbB) {
+          targetStructB.eachResidue(r => {
+            if (r.resno === appState.actualB81ResnoInPdbB && !r.isProtein()) {
+              base81ContactB = evaluateMajorGrooveContact(nzB, r);
+            }
+          });
+
+          if (base81ContactB) {
+            appState.currentDistance81B = base81ContactB.dist;
+            appState.dynamicPair81B.push([nzB.index, base81ContactB.atom.index]);
+            dom.hudBDist81Val.textContent = `${base81ContactB.dist.toFixed(2)} Å`;
+          }
         }
       }
 
       updateDistanceRepresentations();
     }
 
+    // 同時更新兩條測距虛線：K114-DG82（綠/黃氫鍵線）+ K114-Base81（天藍色 Major-Groove Edge 參考線）
     function updateDistanceRepresentations() {
       if (!appState.isFocusMode) return;
 
@@ -615,11 +794,22 @@
           appState.compA.removeRepresentation(appState.distRepA);
           appState.distRepA = null;
         }
+        if (appState.distRep81A) {
+          appState.compA.removeRepresentation(appState.distRep81A);
+          appState.distRep81A = null;
+        }
+
         if (appState.dynamicPairsA.length > 0) {
           const d = appState.currentDistance;
           let lineColor = d > 3.2 ? '#eab308' : '#22c55e';
           appState.distRepA = appState.compA.addRepresentation('distance', {
             atomPair: appState.dynamicPairsA, color: lineColor, radius: 0.05, dashLength: 0.22, labelUnit: 'angstrom', labelSize: 1.3, labelColor: '#facc15', labelBackground: false
+          });
+        }
+
+        if (appState.dynamicPair81A.length > 0) {
+          appState.distRep81A = appState.compA.addRepresentation('distance', {
+            atomPair: appState.dynamicPair81A, color: '#38bdf8', radius: 0.04, dashLength: 0.16, labelUnit: 'angstrom', labelSize: 1.25, labelColor: '#7dd3fc', labelBackground: false
           });
         }
       }
@@ -629,6 +819,11 @@
           appState.compB.removeRepresentation(appState.distRepB);
           appState.distRepB = null;
         }
+        if (appState.distRep81B) {
+          appState.compB.removeRepresentation(appState.distRep81B);
+          appState.distRep81B = null;
+        }
+
         if (appState.dynamicPairsB.length > 0) {
           const dB = appState.currentDistanceB;
           let lineColorB = dB > 3.2 ? '#eab308' : '#22c55e';
@@ -636,10 +831,16 @@
             atomPair: appState.dynamicPairsB, color: lineColorB, radius: 0.05, dashLength: 0.22, labelUnit: 'angstrom', labelSize: 1.3, labelColor: '#facc15', labelBackground: false
           });
         }
+
+        if (appState.dynamicPair81B.length > 0) {
+          appState.distRep81B = appState.compB.addRepresentation('distance', {
+            atomPair: appState.dynamicPair81B, color: '#38bdf8', radius: 0.04, dashLength: 0.16, labelUnit: 'angstrom', labelSize: 1.25, labelColor: '#7dd3fc', labelBackground: false
+          });
+        }
       }
     }
 
-    // 2. 用 Shape.addText 繪製無黑棒、純淨漂浮的 K114 與 DG82 3D 標籤（Panel A）
+    // 繪製純淨漂浮標籤：K114、Base 81 與 DG82（Panel A）
     function updateFocusLabelsA() {
       if (appState.labelShapeCompA) {
         appState.stageA.removeComponent(appState.labelShapeCompA);
@@ -648,7 +849,7 @@
       if (!appState.isFocusMode || !appState.compA || !appState.actualKResnoInPdbA) return;
 
       const st = appState.compA.structure;
-      let posK = null, posDG = null;
+      let posK = null, posDG82 = null, posB81 = null;
 
       st.eachResidue(r => {
         const rn = (r.resname || '').trim().toUpperCase();
@@ -656,20 +857,29 @@
           r.eachAtom(a => { if (a.atomname.trim() === 'NZ') posK = [a.x, a.y + 0.85, a.z]; });
         }
         if (r.resno === appState.actualDGResnoInPdbA) {
-          r.eachAtom(a => { if (a.atomname.trim() === 'O6') posDG = [a.x, a.y + 0.85, a.z]; });
+          r.eachAtom(a => { if (a.atomname.trim() === 'O6') posDG82 = [a.x, a.y + 0.85, a.z]; });
+        }
+        if (r.resno === appState.actualB81ResnoInPdbA && !r.isProtein()) {
+          r.eachAtom(a => {
+            const an = a.atomname.trim();
+            if (!posB81 && ['N7', 'O6', 'N6', 'O4', 'N4', 'C5'].includes(an)) {
+              posB81 = [a.x, a.y + 0.85, a.z];
+            }
+          });
         }
       });
 
-      if (posK || posDG) {
+      if (posK || posDG82 || posB81) {
         const shape = new NGL.Shape("clean_labels_a");
-        if (posK) shape.addText(posK, [0.22, 0.74, 0.97], 1.5, `K${STANDARD_TARGET_K}`);
-        if (posDG) shape.addText(posDG, [0.15, 0.85, 0.45], 1.5, `DG${STANDARD_TARGET_DG}`);
+        if (posK) shape.addText(posK, [0.98, 0.80, 0.15], 1.45, `K${STANDARD_TARGET_K}`);
+        if (posDG82) shape.addText(posDG82, [0.15, 0.85, 0.45], 1.45, `DG${STANDARD_TARGET_DG}`);
+        if (posB81) shape.addText(posB81, [0.22, 0.74, 0.97], 1.45, appState.b81ResnameA);
         appState.labelShapeCompA = appState.stageA.addComponentFromObject(shape);
         appState.labelShapeCompA.addRepresentation("buffer");
       }
     }
 
-    // 2. 用 Shape.addText 繪製無黑棒、純淨漂浮的 K114 與 DG82 3D 標籤（Panel B，同步套用對齊矩陣）
+    // 繪製純淨漂浮標籤：K114、Base 81 與 DG82（Panel B）
     function updateFocusLabelsB() {
       if (appState.labelShapeCompB) {
         appState.stageB.removeComponent(appState.labelShapeCompB);
@@ -678,7 +888,7 @@
       if (!appState.isFocusMode || !appState.compB || !appState.actualKResnoInPdbB) return;
 
       const st = appState.compB.structure;
-      let posK = null, posDG = null;
+      let posK = null, posDG82 = null, posB81 = null;
 
       st.eachResidue(r => {
         const rn = (r.resname || '').trim().toUpperCase();
@@ -686,14 +896,23 @@
           r.eachAtom(a => { if (a.atomname.trim() === 'NZ') posK = [a.x, a.y + 0.85, a.z]; });
         }
         if (r.resno === appState.actualDGResnoInPdbB) {
-          r.eachAtom(a => { if (a.atomname.trim() === 'O6') posDG = [a.x, a.y + 0.85, a.z]; });
+          r.eachAtom(a => { if (a.atomname.trim() === 'O6') posDG82 = [a.x, a.y + 0.85, a.z]; });
+        }
+        if (r.resno === appState.actualB81ResnoInPdbB && !r.isProtein()) {
+          r.eachAtom(a => {
+            const an = a.atomname.trim();
+            if (!posB81 && ['N7', 'O6', 'N6', 'O4', 'N4', 'C5'].includes(an)) {
+              posB81 = [a.x, a.y + 0.85, a.z];
+            }
+          });
         }
       });
 
-      if (posK || posDG) {
+      if (posK || posDG82 || posB81) {
         const shape = new NGL.Shape("clean_labels_b");
-        if (posK) shape.addText(posK, [0.22, 0.74, 0.97], 1.5, `K${STANDARD_TARGET_K}`);
-        if (posDG) shape.addText(posDG, [0.15, 0.85, 0.45], 1.5, `DG${STANDARD_TARGET_DG}`);
+        if (posK) shape.addText(posK, [0.98, 0.80, 0.15], 1.45, `K${STANDARD_TARGET_K}`);
+        if (posDG82) shape.addText(posDG82, [0.15, 0.85, 0.45], 1.45, `DG${STANDARD_TARGET_DG}`);
+        if (posB81) shape.addText(posB81, [0.22, 0.74, 0.97], 1.45, appState.b81ResnameB);
         appState.labelShapeCompB = appState.stageB.addComponentFromObject(shape);
         appState.labelShapeCompB.addRepresentation("buffer");
         if (appState.transformMatrixB) {
@@ -736,6 +955,7 @@
       });
     }
 
+    // 特寫模式下同時顯示 K114、Base 81 與 DG82 的 Licorice 棒狀模型（Panel A）
     function updateFocusPairA() {
       if (!appState.compA) return;
       if (appState.licoriceRepA) {
@@ -743,7 +963,7 @@
         appState.licoriceRepA = null;
       }
       if (appState.isFocusMode && appState.actualKResnoInPdbA) {
-        const pairSele = `(${appState.actualKResnoInPdbA} and protein) or (${appState.actualDGResnoInPdbA} and not protein)`;
+        const pairSele = `(${appState.actualKResnoInPdbA} and protein) or ((${appState.actualB81ResnoInPdbA} or ${appState.actualDGResnoInPdbA}) and not protein)`;
         appState.licoriceRepA = appState.compA.addRepresentation('licorice', {
           sele: `${pairSele} and not hydrogen`,
           colorScheme: 'element',
@@ -757,6 +977,7 @@
       updateFocusLabelsA();
     }
 
+    // 特寫模式下同時顯示 K114、Base 81 與 DG82 的 Licorice 棒狀模型（Panel B）
     function updateFocusPairB() {
       if (!appState.compB) return;
       if (appState.licoriceRepB) {
@@ -764,7 +985,7 @@
         appState.licoriceRepB = null;
       }
       if (appState.isFocusMode && appState.actualKResnoInPdbB) {
-        const pairSeleB = `(${appState.actualKResnoInPdbB} and protein) or (${appState.actualDGResnoInPdbB} and not protein)`;
+        const pairSeleB = `(${appState.actualKResnoInPdbB} and protein) or ((${appState.actualB81ResnoInPdbB} or ${appState.actualDGResnoInPdbB}) and not protein)`;
         appState.licoriceRepB = appState.compB.addRepresentation('licorice', {
           sele: `${pairSeleB} and not hydrogen`,
           colorScheme: 'element',
@@ -844,6 +1065,7 @@
       if (!appState.compA) return;
       appState.compA.removeAllRepresentations();
       appState.distRepA = null;
+      appState.distRep81A = null;
       appState.zincRepA = null;
       appState.licoriceRepA = null;
 
@@ -865,14 +1087,7 @@
 
       if (appState.isFocusMode && appState.actualKResnoInPdbA) {
         updateFocusPairA();
-
-        if (appState.dynamicPairsA.length > 0) {
-          const d = appState.currentDistance;
-          let lineColor = d > 3.2 ? '#eab308' : '#22c55e';
-          appState.distRepA = appState.compA.addRepresentation('distance', {
-            atomPair: appState.dynamicPairsA, color: lineColor, radius: 0.05, dashLength: 0.22, labelUnit: 'angstrom', labelSize: 1.3, labelColor: '#facc15', labelBackground: false
-          });
-        }
+        updateDistanceRepresentations();
       } else {
         updateFocusLabelsA();
       }
@@ -882,6 +1097,7 @@
       if (!appState.compB) return;
       appState.compB.removeAllRepresentations();
       appState.distRepB = null;
+      appState.distRep81B = null;
       appState.zincRepB = null;
       appState.licoriceRepB = null;
 
@@ -903,14 +1119,7 @@
 
       if (appState.isFocusMode && appState.actualKResnoInPdbB) {
         updateFocusPairB();
-
-        if (appState.dynamicPairsB.length > 0) {
-          const dB = appState.currentDistanceB;
-          let lineColorB = dB > 3.2 ? '#eab308' : '#22c55e';
-          appState.distRepB = appState.compB.addRepresentation('distance', {
-            atomPair: appState.dynamicPairsB, color: lineColorB, radius: 0.05, dashLength: 0.22, labelUnit: 'angstrom', labelSize: 1.3, labelColor: '#facc15', labelBackground: false
-          });
-        }
+        updateDistanceRepresentations();
       } else {
         updateFocusLabelsB();
       }
@@ -1227,16 +1436,17 @@
         dom.focusBtnText.textContent = '重設視角';
         dom.focusBtnTextMobile.textContent = '重設';
         
-        const focusSeleA = `(${appState.actualKResnoInPdbA} and protein) or (${appState.actualDGResnoInPdbA} and not protein)`;
+        // 特寫視角同時涵蓋 K114 與 Base 81 / DG82 區域
+        const focusSeleA = `(${appState.actualKResnoInPdbA} and protein) or ((${appState.actualB81ResnoInPdbA} or ${appState.actualDGResnoInPdbA}) and not protein)`;
         appState.compA.autoView(focusSeleA, 600);
 
         if (appState.compB && appState.actualKResnoInPdbB) {
-          const focusSeleB = `(${appState.actualKResnoInPdbB} and protein) or (${appState.actualDGResnoInPdbB} and not protein)`;
+          const focusSeleB = `(${appState.actualKResnoInPdbB} and protein) or ((${appState.actualB81ResnoInPdbB} or ${appState.actualDGResnoInPdbB}) and not protein)`;
           appState.compB.autoView(focusSeleB, 600);
         }
       } else {
         dom.btnFocusPair.classList.remove('bg-amber-500/30', 'border-amber-400');
-        dom.focusBtnText.textContent = '特寫 K114 - DG82';
+        dom.focusBtnText.textContent = '特寫 K114 - B81/82';
         dom.focusBtnTextMobile.textContent = '特寫';
         
         appState.stageA.autoView(500);
@@ -1419,7 +1629,7 @@
       appState.stageA.handleResize();
       if (appState.compA) {
         if (appState.isFocusMode) {
-          const focusSele = `(${appState.actualKResnoInPdbA} and protein) or (${appState.actualDGResnoInPdbA} and not protein)`;
+          const focusSele = `(${appState.actualKResnoInPdbA} and protein) or ((${appState.actualB81ResnoInPdbA} or ${appState.actualDGResnoInPdbA}) and not protein)`;
           appState.compA.autoView(focusSele, 0);
         } else {
           appState.compA.autoView(0);
